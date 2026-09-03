@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Inventory POS{% endblock %}
+
+{% block content %}
+  <h1>Dashboard</h1>
+  <p class="lede">Sell from the POS counter, and manage stock and purchases in admin.</p>
+
+  <section class="stats">
+    <article class="stat">
+      <span class="stat-value">{{ product_count }}</span>
+      <span class="stat-label">Active products</span>
+    </article>
+    <article class="stat">
+      <span class="stat-value">{{ category_count }}</span>
+      <span class="stat-label">Categories</span>
+    </article>
+  </section>
+  <p><a href="{% url 'pos:counter' %}">Open POS counter</a></p>
+
+  <section>
+    <h2>Products</h2>
+    {% if products %}
+      <table>
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Brand</th>
+            <th>Base unit</th>
+            <th>Min stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+            <tr>
+              <td>{{ product.sku }}</td>
+              <td>{{ product.name }}</td>
+              <td>{{ product.category }}</td>
+              <td>{{ product.brand|default:"—" }}</td>
+              <td>{{ product.base_unit }}</td>
+              <td>{{ product.min_stock }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No products yet. Add units, categories, and products in <a href="{% url 'admin:index' %}">admin</a>.</p>
+    {% endif %}
+  </section>
+{% endblock %}

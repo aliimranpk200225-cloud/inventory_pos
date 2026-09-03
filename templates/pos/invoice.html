@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}{{ sale.invoice_number }} — Inventory POS{% endblock %}
+
+{% block extra_css %}
+  <style>
+    .invoice { max-width: 720px; margin: 0 auto; background: #fff; border: 1px solid var(--line); padding: 2rem; }
+    .invoice header { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+    .invoice h1 { margin: 0 0 0.25rem; }
+    .muted { color: var(--muted); }
+    .invoice .totals { margin-left: auto; width: 16rem; }
+    .invoice .totals div { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+    .invoice .totals .grand { font-weight: 700; border-top: 1px solid var(--line); margin-top: 0.5rem; padding-top: 0.5rem; }
+    .actions { margin: 1.5rem 0; display: flex; gap: 1rem; }
+    .actions a, .actions button { background: var(--accent); color: #fff; border: 0; padding: 0.55rem 1rem; text-decoration: none; border-radius: 6px; cursor: pointer; font: inherit; }
+    @media print {
+      .topbar, .actions { display: none; }
+      .invoice { border: 0; padding: 0; }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="actions">
+    <a href="{% url 'pos:counter' %}">New sale</a>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+  <article class="invoice">
+    <header>
+      <div>
+        <h1>Inventory POS</h1>
+        <p class="muted">Sales invoice</p>
+      </div>
+      <div>
+        <strong>{{ sale.invoice_number }}</strong><br>
+        {{ sale.created_at|date:"d M Y, H:i" }}<br>
+        Cashier: {{ sale.cashier }}
+      </div>
+    </header>
+    <p>
+      <strong>Bill to</strong><br>
+      {{ sale.customer_name|default:"Walk-in" }}<br>
+      {% if sale.customer_phone %}{{ sale.customer_phone }}<br>{% endif %}
+      {% if sale.customer and sale.customer.address %}{{ sale.customer.address }}{% endif %}
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Item</th>
+          <th>Qty</th>
+          <th>Price</th>
+          <th>Discount</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in sale.items.all %}
+          <tr>
+            <td>{{ item.product_unit.product.sku }}</td>
+            <td>{{ item.product_unit.product.name }} ({{ item.product_unit.unit }})</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.unit_price }}</td>
+            <td>
+              {% if item.discount_value %}
+                {% if item.discount_type == 'percent' %}{{ item.discount_value }}%{% else %}Rs. {{ item.discount_value }}{% endif %}
+                ({{ item.applied_discount }})
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>{{ item.total }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="totals">
+      <div><span>Subtotal</span><span>{{ sale.subtotal }}</span></div>
+      <div>
+        <span>Invoice discount
+          {% if sale.discount_value %}
+            ({% if sale.discount_type == 'percent' %}{{ sale.discount_value }}%{% else %}Rs. {{ sale.discount_value }}{% endif %})
+          {% endif %}
+        </span>
+        <span>{{ sale.applied_discount }}</span>
+      </div>
+      <div><span>Tax</span><span>{{ sale.tax }}</span></div>
+      <div class="grand"><span>Total</span><span>Rs. {{ sale.total }}</span></div>
+      <div><span>Paid ({{ sale.get_payment_method_display }})</span><span>{{ sale.paid_amount }}</span></div>
+      <div><span>Due</span><span>{{ sale.due_amount }}</span></div>
+    </div>
+    {% if sale.notes %}<p>Notes: {{ sale.notes }}</p>{% endif %}
+  </article>
+{% endblock %}
