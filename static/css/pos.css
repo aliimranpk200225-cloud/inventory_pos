@@ -45,6 +45,29 @@
 .product-card strong { display: block; }
 .product-card .meta { color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }
 .product-card .price { color: var(--accent); font-weight: 700; margin-top: 0.4rem; }
+.product-card .stock-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+}
+.product-card.low-stock { border-color: #fdba74; }
+.product-card.out-of-stock {
+  border-color: #fecaca;
+  opacity: 0.78;
+}
+.stock-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+}
+.stock-badge.low { background: #ffedd5; color: #9a3412; }
+.stock-badge.out { background: #fee2e2; color: #991b1b; }
+.cart-stock-warn { color: #9a3412; font-size: 0.75rem; }
 
 .pos-ticket {
   background: var(--card);

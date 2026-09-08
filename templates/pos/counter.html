@@ -92,7 +92,8 @@
       csrfToken: "{{ csrf_token }}",
       productsUrl: "{% url 'pos:product_search' %}",
       customersUrl: "{% url 'pos:customer_search' %}",
-      checkoutUrl: "{% url 'pos:checkout' %}"
+      checkoutUrl: "{% url 'pos:checkout' %}",
+      allowNegativeStock: {% if allow_negative_stock %}true{% else %}false{% endif %}
     };
   </script>
   <script src="{% static 'js/pos.js' %}"></script>

@@ -58,6 +58,37 @@ def current_stock(product, *, exclude_reference=None):
     return total or Decimal('0.0000')
 
 
+STOCK_OK = 'ok'
+STOCK_LOW = 'low'
+STOCK_OUT = 'out'
+
+
+def format_quantity(value):
+    text = format(Decimal(str(value or 0)), 'f')
+    if '.' in text:
+        text = text.rstrip('0').rstrip('.')
+    return text or '0'
+
+
+def classify_stock(on_hand, min_stock=0):
+    """Return ok / low / out from base-unit on-hand and the product min_stock."""
+    on_hand = Decimal(str(on_hand or 0))
+    min_stock = Decimal(str(min_stock or 0))
+    if on_hand <= 0:
+        return STOCK_OUT
+    if min_stock > 0 and on_hand <= min_stock:
+        return STOCK_LOW
+    return STOCK_OK
+
+
+def stock_status_label(status):
+    return {
+        STOCK_OUT: 'Out of stock',
+        STOCK_LOW: 'Low stock',
+        STOCK_OK: 'In stock',
+    }.get(status, 'In stock')
+
+
 def annotate_current_stock(queryset):
     """Annotate a Product queryset with stock_on_hand for reports."""
     decimal = DecimalField(max_digits=12, decimal_places=4)
@@ -72,8 +103,22 @@ def annotate_current_stock(queryset):
     )
 
 
-def low_stock_products():
-    return annotate_current_stock(Product.objects.filter(active=True)).filter(
+def _active_stock_qs(active_only=True):
+    qs = Product.objects.all()
+    if active_only:
+        qs = qs.filter(active=True)
+    return annotate_current_stock(qs)
+
+
+def out_of_stock_products(active_only=True):
+    return _active_stock_qs(active_only).filter(stock_on_hand__lte=0)
+
+
+def low_stock_products(active_only=True):
+    """On hand is above zero but at or below the product's minimum."""
+    return _active_stock_qs(active_only).filter(
+        min_stock__gt=0,
+        stock_on_hand__gt=0,
         stock_on_hand__lte=F('min_stock'),
     )
 

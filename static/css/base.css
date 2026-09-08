@@ -72,6 +72,29 @@ nav a:hover { color: #fff; }
 
 .stat-label { color: var(--muted); font-size: 0.9rem; }
 
+.stat.warning .stat-value { color: #c2410c; }
+.stat.danger .stat-value { color: #b91c1c; }
+
+.badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge-ok { background: #d1fae5; color: #065f46; }
+.badge-low { background: #ffedd5; color: #9a3412; }
+.badge-out { background: #fee2e2; color: #991b1b; }
+
+.row-low { background: #fff7ed; }
+.row-out { background: #fef2f2; }
+
+.stock-alerts { margin: 2rem 0; }
+.stock-alerts h3 { margin: 1.25rem 0 0.5rem; font-size: 1rem; }
+
 table {
   width: 100%;
   border-collapse: collapse;

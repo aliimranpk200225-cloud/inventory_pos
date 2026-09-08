@@ -15,8 +15,72 @@
       <span class="stat-value">{{ category_count }}</span>
       <span class="stat-label">Categories</span>
     </article>
+    <article class="stat{% if low_stock_count %} warning{% endif %}">
+      <span class="stat-value">{{ low_stock_count }}</span>
+      <span class="stat-label">Low stock</span>
+    </article>
+    <article class="stat{% if out_of_stock_count %} danger{% endif %}">
+      <span class="stat-value">{{ out_of_stock_count }}</span>
+      <span class="stat-label">Out of stock</span>
+    </article>
   </section>
   <p><a href="{% url 'pos:counter' %}">Open POS counter</a></p>
+
+  {% if out_of_stock_products or low_stock_products %}
+    <section class="stock-alerts">
+      <h2>Stock alerts</h2>
+      {% if out_of_stock_products %}
+        <h3>Out of stock</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Name</th>
+              <th>On hand</th>
+              <th>Min stock</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in out_of_stock_products %}
+              <tr class="row-out">
+                <td>{{ product.sku }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.stock_display }} {{ product.base_unit }}</td>
+                <td>{{ product.min_display }}</td>
+                <td><span class="badge badge-out">Out of stock</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      {% if low_stock_products %}
+        <h3>Low stock</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Name</th>
+              <th>On hand</th>
+              <th>Min stock</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in low_stock_products %}
+              <tr class="row-low">
+                <td>{{ product.sku }}</td>
+                <td>{{ product.name }}</td>
+                <td>{{ product.stock_display }} {{ product.base_unit }}</td>
+                <td>{{ product.min_display }}</td>
+                <td><span class="badge badge-low">Low stock</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </section>
+  {% endif %}
 
   <section>
     <h2>Products</h2>
@@ -28,19 +92,29 @@
             <th>Name</th>
             <th>Category</th>
             <th>Brand</th>
-            <th>Base unit</th>
+            <th>On hand</th>
             <th>Min stock</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {% for product in products %}
-            <tr>
+            <tr{% if product.stock_status == 'out' %} class="row-out"{% elif product.stock_status == 'low' %} class="row-low"{% endif %}>
               <td>{{ product.sku }}</td>
               <td>{{ product.name }}</td>
               <td>{{ product.category }}</td>
               <td>{{ product.brand|default:"—" }}</td>
-              <td>{{ product.base_unit }}</td>
-              <td>{{ product.min_stock }}</td>
+              <td>{{ product.stock_display }} {{ product.base_unit }}</td>
+              <td>{{ product.min_display }}</td>
+              <td>
+                {% if product.stock_status == 'out' %}
+                  <span class="badge badge-out">Out of stock</span>
+                {% elif product.stock_status == 'low' %}
+                  <span class="badge badge-low">Low stock</span>
+                {% else %}
+                  <span class="badge badge-ok">In stock</span>
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>

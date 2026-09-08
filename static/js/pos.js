@@ -49,15 +49,40 @@
     }
   }
 
+  function showError(message) {
+    errorEl.textContent = message;
+    errorEl.hidden = !message;
+  }
+
+  function availableBase(item) {
+    return Number(item.stock_on_hand) || 0;
+  }
+
+  function neededBase(item, quantity) {
+    const qty = Number(quantity);
+    const conversion = Number(item.conversion_to_base) || 1;
+    return (Number.isFinite(qty) ? qty : 0) * conversion;
+  }
+
+  function stockBadge(status) {
+    if (status === 'out') return '<span class="stock-badge out">Out of stock</span>';
+    if (status === 'low') return '<span class="stock-badge low">Low stock</span>';
+    return '';
+  }
+
   function renderCart() {
     if (!cart.length) {
       cartBody.innerHTML = '<tr class="empty-cart"><td colspan="6">Select products to add them to the invoice.</td></tr>';
     } else {
       cartBody.innerHTML = cart.map(function (item, index) {
         const amounts = lineAmounts(item);
+        const remaining = availableBase(item) - neededBase(item, item.quantity);
+        const warn = remaining < 0
+          ? '<div class="cart-stock-warn">Exceeds on-hand stock</div>'
+          : (item.stock_status === 'low' ? '<div class="cart-stock-warn">Low stock (' + item.stock_on_hand + ' ' + item.base_unit + ')</div>' : '');
         return (
           '<tr data-index="' + index + '">' +
-            '<td><strong>' + item.name + '</strong><div class="meta">' + item.sku + ' · ' + item.unit + '</div></td>' +
+            '<td><strong>' + item.name + '</strong><div class="meta">' + item.sku + ' · ' + item.unit + ' · ' + item.stock_on_hand + ' ' + item.base_unit + ' on hand</div>' + warn + '</td>' +
             '<td><input class="qty" type="number" min="0.0001" step="1" value="' + item.quantity + '"></td>' +
             '<td><input class="price" type="number" min="0" step="0.01" value="' + item.unit_price + '"></td>' +
             '<td>' +
@@ -77,19 +102,37 @@
   }
 
   function addProduct(product) {
+    const nextQty = (function () {
+      const existing = cart.find(function (item) { return item.product_unit_id === product.id; });
+      return existing ? Number(existing.quantity) + 1 : 1;
+    })();
+    const needed = neededBase(product, nextQty);
+    if (!config.allowNegativeStock && needed > availableBase(product)) {
+      if (availableBase(product) <= 0) {
+        showError(product.name + ' is out of stock.');
+      } else {
+        showError('Not enough stock for ' + product.name + ' (' + product.stock_on_hand + ' ' + product.base_unit + ' on hand).');
+      }
+      return;
+    }
+    showError('');
     const existing = cart.find(function (item) { return item.product_unit_id === product.id; });
     if (existing) {
-      existing.quantity = Number(existing.quantity) + 1;
+      existing.quantity = nextQty;
     } else {
       cart.push({
         product_unit_id: product.id,
         sku: product.sku,
         name: product.name,
         unit: product.unit,
+        base_unit: product.base_unit,
         quantity: 1,
         unit_price: product.retail_price,
         discount_type: 'fixed',
         discount_value: 0,
+        conversion_to_base: product.conversion_to_base,
+        stock_on_hand: product.stock_on_hand,
+        stock_status: product.stock_status,
       });
     }
     renderCart();
@@ -101,11 +144,16 @@
       return;
     }
     resultsEl.innerHTML = products.map(function (product) {
+      const statusClass = product.stock_status === 'out' ? ' out-of-stock' : (product.stock_status === 'low' ? ' low-stock' : '');
       return (
-        '<button type="button" class="product-card" data-id="' + product.id + '">' +
+        '<button type="button" class="product-card' + statusClass + '" data-id="' + product.id + '">' +
           '<strong>' + product.name + '</strong>' +
           '<div class="meta">' + product.sku + ' · ' + product.unit + '</div>' +
           '<div class="price">Rs. ' + money(product.retail_price) + '</div>' +
+          '<div class="stock-line">' +
+            '<span>' + product.stock_in_unit + ' ' + product.unit + '</span>' +
+            stockBadge(product.stock_status) +
+          '</div>' +
         '</button>'
       );
     }).join('');
@@ -141,6 +189,24 @@
     const amounts = lineAmounts(item);
     const totalCell = row.querySelector('.line-total');
     if (totalCell) totalCell.textContent = money(amounts.total);
+    const metaCell = row.querySelector('td');
+    if (metaCell && event.target.classList.contains('qty')) {
+      let warn = metaCell.querySelector('.cart-stock-warn');
+      const remaining = availableBase(item) - neededBase(item, item.quantity);
+      const text = remaining < 0
+        ? 'Exceeds on-hand stock'
+        : (item.stock_status === 'low' ? 'Low stock (' + item.stock_on_hand + ' ' + item.base_unit + ')' : '');
+      if (text) {
+        if (!warn) {
+          warn = document.createElement('div');
+          warn.className = 'cart-stock-warn';
+          metaCell.appendChild(warn);
+        }
+        warn.textContent = text;
+      } else if (warn) {
+        warn.remove();
+      }
+    }
     updateTotals();
   });
 
@@ -170,7 +236,16 @@
   });
 
   document.getElementById('checkout-btn').addEventListener('click', function () {
-    errorEl.hidden = true;
+    showError('');
+    if (!config.allowNegativeStock) {
+      const oversold = cart.find(function (item) {
+        return neededBase(item, item.quantity) > availableBase(item);
+      });
+      if (oversold) {
+        showError('Not enough stock for ' + oversold.name + ' (' + oversold.stock_on_hand + ' ' + oversold.base_unit + ' on hand).');
+        return;
+      }
+    }
     const totals = invoiceAmounts();
     const paidField = document.getElementById('paid-amount').value;
     const payload = {

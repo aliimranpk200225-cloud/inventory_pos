@@ -20,6 +20,9 @@ from inventory.models import (
 )
 from inventory.stock import (
     current_stock,
+    classify_stock,
+    low_stock_products,
+    out_of_stock_products,
     sync_adjustment_stock,
     sync_purchase_stock,
     sync_sale_stock,
@@ -328,3 +331,80 @@ class StockLedgerTests(TestCase):
     def test_negative_stock_can_be_allowed(self):
         self._sale([{'unit': self.unit_bottle, 'qty': 3}])
         self.assertEqual(current_stock(self.product), Decimal('-3.0000'))
+
+
+class StockStatusTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('staff', password='pass-12345', is_staff=True)
+        self.category = Category.objects.create(name='Drinks')
+        self.bottle = Unit.objects.create(name='Bottle', abbreviation='Btl')
+        self.supplier = Supplier.objects.create(name='Bottler')
+        self.out_product = self._product('OUT1', 'Out Cola', min_stock=5)
+        self.low_product = self._product('LOW1', 'Low Cola', min_stock=10)
+        self.ok_product = self._product('OK1', 'Ok Cola', min_stock=5)
+
+    def _product(self, sku, name, min_stock):
+        product = Product.objects.create(
+            name=name,
+            sku=sku,
+            category=self.category,
+            base_unit=self.bottle,
+            min_stock=min_stock,
+        )
+        ProductUnit.objects.create(
+            product=product,
+            unit=self.bottle,
+            conversion_to_base=Decimal('1'),
+            purchase_price=Decimal('10.00'),
+            retail_price=Decimal('15.00'),
+            wholesale_price=Decimal('12.00'),
+        )
+        return product
+
+    def _post_qty(self, product, qty):
+        unit = product.product_units.get()
+        purchase = Purchase.objects.create(
+            supplier=self.supplier,
+            invoice_number=f'PO-{product.sku}',
+            purchase_date=date.today(),
+            created_by=self.user,
+            status=PostingStatus.POSTED,
+        )
+        PurchaseItem.objects.create(
+            purchase=purchase,
+            product_unit=unit,
+            quantity=qty,
+            unit_price=unit.purchase_price,
+        )
+        sync_purchase_stock(purchase, self.user)
+
+    def test_classify_stock_out_low_ok(self):
+        self.assertEqual(classify_stock(0, 10), 'out')
+        self.assertEqual(classify_stock(-1, 10), 'out')
+        self.assertEqual(classify_stock(5, 10), 'low')
+        self.assertEqual(classify_stock(10, 10), 'low')
+        self.assertEqual(classify_stock(11, 10), 'ok')
+        self.assertEqual(classify_stock(5, 0), 'ok')
+
+    def test_low_and_out_queries(self):
+        self._post_qty(self.low_product, 4)
+        self._post_qty(self.ok_product, 20)
+        out_skus = set(out_of_stock_products().values_list('sku', flat=True))
+        low_skus = set(low_stock_products().values_list('sku', flat=True))
+        self.assertIn('OUT1', out_skus)
+        self.assertNotIn('OUT1', low_skus)
+        self.assertIn('LOW1', low_skus)
+        self.assertNotIn('OK1', out_skus)
+        self.assertNotIn('OK1', low_skus)
+
+    def test_dashboard_shows_stock_alerts(self):
+        self._post_qty(self.low_product, 4)
+        self._post_qty(self.ok_product, 20)
+        response = self.client.get('/')
+        self.assertContains(response, 'Out of stock')
+        self.assertContains(response, 'Low stock')
+        self.assertContains(response, 'Out Cola')
+        self.assertContains(response, 'Low Cola')
+        self.assertContains(response, 'Ok Cola')
+        self.assertContains(response, 'In stock')
+

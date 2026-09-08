@@ -1,12 +1,22 @@
 from django.contrib import admin
 from django.db import transaction
+from django.db.models import F, Q
 from django.forms.widgets import Script
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import path
+from django.utils.html import format_html
 
 from inventory.models import PostingStatus
-from inventory.stock import annotate_current_stock, sync_adjustment_stock, sync_purchase_stock
+from inventory.stock import (
+    STOCK_LOW,
+    STOCK_OUT,
+    annotate_current_stock,
+    classify_stock,
+    stock_status_label,
+    sync_adjustment_stock,
+    sync_purchase_stock,
+)
 
 from .forms import PurchaseItemForm
 
@@ -119,6 +129,34 @@ class ProductUnitInline(admin.TabularInline):
     autocomplete_fields = ('unit',)
 
 
+class StockStatusFilter(admin.SimpleListFilter):
+    title = 'stock status'
+    parameter_name = 'stock_status'
+
+    def lookups(self, request, model_admin):
+        return (
+            (STOCK_OUT, 'Out of stock'),
+            (STOCK_LOW, 'Low stock'),
+            ('ok', 'In stock'),
+        )
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if value == STOCK_OUT:
+            return queryset.filter(stock_on_hand__lte=0)
+        if value == STOCK_LOW:
+            return queryset.filter(
+                min_stock__gt=0,
+                stock_on_hand__gt=0,
+                stock_on_hand__lte=F('min_stock'),
+            )
+        if value == 'ok':
+            return queryset.filter(
+                Q(stock_on_hand__gt=F('min_stock')) | Q(min_stock=0, stock_on_hand__gt=0)
+            )
+        return queryset
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = (
@@ -129,9 +167,10 @@ class ProductAdmin(admin.ModelAdmin):
         'base_unit',
         'min_stock',
         'stock_on_hand',
+        'stock_status',
         'active',
     )
-    list_filter = ('active', 'category', 'brand')
+    list_filter = ('active', StockStatusFilter, 'category', 'brand')
     search_fields = ('sku', 'name', 'brand', 'product_units__barcode')
     list_editable = ('active',)
     autocomplete_fields = ('category', 'base_unit')
@@ -142,10 +181,30 @@ class ProductAdmin(admin.ModelAdmin):
 
     @admin.display(description='On hand')
     def stock_on_hand(self, obj):
-        value = getattr(obj, 'stock_on_hand', None)
+        value = obj.__dict__.get('stock_on_hand')
         if value is None:
             return obj.current_stock()
         return value
+
+    @admin.display(description='Status')
+    def stock_status(self, obj):
+        on_hand = obj.__dict__.get('stock_on_hand')
+        if on_hand is None:
+            on_hand = obj.current_stock()
+        status = classify_stock(on_hand, obj.min_stock)
+        colors = {
+            STOCK_OUT: ('#991b1b', '#fee2e2'),
+            STOCK_LOW: ('#9a3412', '#ffedd5'),
+            'ok': ('#065f46', '#d1fae5'),
+        }
+        color, background = colors[status]
+        return format_html(
+            '<span style="display:inline-block;padding:0.1rem 0.5rem;border-radius:999px;'
+            'font-weight:700;font-size:0.75rem;color:{};background:{}">{}</span>',
+            color,
+            background,
+            stock_status_label(status),
+        )
 
 
 @admin.register(ProductUnit)
