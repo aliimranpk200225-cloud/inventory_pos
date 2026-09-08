@@ -71,6 +71,13 @@ class Sale(DiscountMixin, models.Model):
         choices=PostingStatus.choices,
         default=PostingStatus.DRAFT,
     )
+    cash_session = models.ForeignKey(
+        'CashSession',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='sales',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -146,3 +153,107 @@ class SaleItem(DiscountMixin, models.Model):
         self.base_quantity = self.quantity * self.product_unit.conversion_to_base
         self.total = self.line_subtotal - self.applied_discount + self.tax
         super().save(*args, **kwargs)
+
+
+class CashSession(models.Model):
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Open'
+        CLOSED = 'closed', 'Closed'
+
+    cashier = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='cash_sessions',
+    )
+    opened_at = models.DateTimeField()
+    closed_at = models.DateTimeField(null=True, blank=True)
+    opening_cash = models.DecimalField(max_digits=12, decimal_places=2)
+    cash_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    card_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    other_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    refunds = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cash_in = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cash_out = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    expenses = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    expected_closing_cash = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    actual_closing_cash = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    cash_difference = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    completed_orders = models.PositiveIntegerField(default=0)
+    cancelled_orders = models.PositiveIntegerField(default=0)
+    draft_orders = models.PositiveIntegerField(default=0)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.OPEN,
+        db_index=True,
+    )
+
+    class Meta:
+        ordering = ['-opened_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cashier'],
+                condition=models.Q(status='open'),
+                name='unique_open_pos_session_per_cashier',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['cashier', 'status']),
+        ]
+
+    def __str__(self):
+        when = timezone.localtime(self.opened_at).strftime('%d-%b-%Y %H:%M')
+        return f'{self.cashier} {when} ({self.status})'
+
+    @property
+    def is_open(self):
+        return self.status == self.Status.OPEN
+
+    @property
+    def total_sales(self):
+        return self.cash_sales + self.card_sales + self.other_sales
+
+
+class CashMovement(models.Model):
+    class MovementType(models.TextChoices):
+        CASH_IN = 'cash_in', 'Cash in'
+        CASH_OUT = 'cash_out', 'Cash out'
+        EXPENSE = 'expense', 'Expense'
+        REFUND = 'refund', 'Refund'
+
+    session = models.ForeignKey(
+        CashSession,
+        on_delete=models.PROTECT,
+        related_name='movements',
+    )
+    movement_type = models.CharField(max_length=12, choices=MovementType.choices)
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+    )
+    payment_method = models.CharField(
+        max_length=10,
+        choices=Sale.PaymentMethod.choices,
+        default=Sale.PaymentMethod.CASH,
+    )
+    reason = models.CharField(max_length=200, blank=True)
+    sale = models.ForeignKey(
+        Sale,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cash_movements',
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='cash_movements',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f'{self.get_movement_type_display()} Rs. {self.amount}'

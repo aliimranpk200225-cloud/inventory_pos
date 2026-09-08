@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% load pos_extras %}
+
+{% block title %}Orders — Inventory POS{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <h1>Orders</h1>
+    <a class="btn" href="{% url 'pos:counter' %}">New sale</a>
+  </div>
+  <p class="pos-actions">
+    <a href="{% url 'pos:orders' %}">All</a>
+    <a href="{% url 'pos:orders' %}?status=draft">Drafts</a>
+    <a href="{% url 'pos:orders' %}?status=posted">Completed</a>
+    <a href="{% url 'pos:orders' %}?status=cancelled">Cancelled</a>
+    <a href="{% url 'pos:day' %}">Back to POS</a>
+  </p>
+  {% if sales %}
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Pay</th>
+          <th>Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales %}
+          <tr>
+            <td>
+              {% if sale.status == 'draft' %}
+                <a href="{% url 'pos:counter_edit' sale.pk %}">{{ sale.invoice_number }}</a>
+              {% elif sale.status == 'posted' %}
+                <a href="{% url 'pos:invoice' sale.pk %}">{{ sale.invoice_number }}</a>
+              {% else %}
+                {{ sale.invoice_number }}
+              {% endif %}
+            </td>
+            <td>{{ sale.customer_name|default:"Walk-in" }}</td>
+            <td>{{ sale.get_status_display }}</td>
+            <td>{{ sale.get_payment_method_display }}</td>
+            <td>Rs. {{ sale.total|rs }}</td>
+            <td>
+              {% if sale.status != 'cancelled' %}
+                <form method="post" action="{% url 'pos:order_cancel' sale.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="linkish">Cancel</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="lede">No orders in this list.</p>
+  {% endif %}
+{% endblock %}

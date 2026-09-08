@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load pos_extras %}
 
 {% block title %}POS Counter — Inventory POS{% endblock %}
 
@@ -8,9 +9,22 @@
 {% endblock %}
 
 {% block content %}
+  {% if session %}
+    <div class="pos-toolbar">
+      <a href="{% url 'pos:day' %}">← POS day</a>
+      <span>Opening Rs. {{ totals.opening_cash|rs }}</span>
+      <span>Sales Rs. {{ totals.total_sales|rs }}</span>
+      <span>Cash Rs. {{ totals.cash_sales|rs }}</span>
+      <span>Card Rs. {{ totals.card_sales|rs }}</span>
+      <span>Expected Rs. {{ totals.expected_closing_cash|rs }}</span>
+      <span>Orders {{ totals.completed_orders }}</span>
+      <a href="{% url 'pos:orders' %}?status=draft">Drafts</a>
+      <a href="{% url 'pos:session_close' %}">Close POS</a>
+    </div>
+  {% endif %}
   <div class="pos-layout">
     <section class="pos-catalog">
-      <h1>POS</h1>
+      <h1>{% if draft %}Edit draft {{ draft.invoice_number }}{% else %}POS{% endif %}</h1>
       <label class="sr-only" for="product-search">Search products</label>
       <input id="product-search" type="search" placeholder="Search name, SKU, or barcode" autocomplete="off">
       <div id="product-results" class="product-grid"></div>
@@ -68,7 +82,10 @@
       </div>
 
       <p id="pos-error" class="pos-error" hidden></p>
-      <button id="checkout-btn" type="button" class="checkout">Complete sale</button>
+      <div class="ticket-actions">
+        <button id="draft-btn" type="button" class="checkout secondary">Save draft</button>
+        <button id="checkout-btn" type="button" class="checkout">Complete sale</button>
+      </div>
 
       {% if recent_sales %}
         <h3>Recent invoices</h3>
@@ -87,12 +104,15 @@
 {% endblock %}
 
 {% block extra_js %}
+  {% if draft %}{{ draft|json_script:"pos-draft" }}{% endif %}
   <script>
     window.POS_CONFIG = {
       csrfToken: "{{ csrf_token }}",
       productsUrl: "{% url 'pos:product_search' %}",
       customersUrl: "{% url 'pos:customer_search' %}",
       checkoutUrl: "{% url 'pos:checkout' %}",
+      draftUrl: "{% url 'pos:draft' %}",
+      dayUrl: "{% url 'pos:day' %}",
       allowNegativeStock: {% if allow_negative_stock %}true{% else %}false{% endif %}
     };
   </script>

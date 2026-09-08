@@ -1,11 +1,13 @@
 (function () {
   const config = window.POS_CONFIG || {};
   const cart = [];
+  let saleId = null;
 
   const searchInput = document.getElementById('product-search');
   const resultsEl = document.getElementById('product-results');
   const cartBody = document.getElementById('cart-body');
   const errorEl = document.getElementById('pos-error');
+  const draftEl = document.getElementById('pos-draft');
   let searchTimer = null;
 
   function money(value) {
@@ -235,17 +237,7 @@
       });
   });
 
-  document.getElementById('checkout-btn').addEventListener('click', function () {
-    showError('');
-    if (!config.allowNegativeStock) {
-      const oversold = cart.find(function (item) {
-        return neededBase(item, item.quantity) > availableBase(item);
-      });
-      if (oversold) {
-        showError('Not enough stock for ' + oversold.name + ' (' + oversold.stock_on_hand + ' ' + oversold.base_unit + ' on hand).');
-        return;
-      }
-    }
+  function buildPayload(forDraft) {
     const totals = invoiceAmounts();
     const paidField = document.getElementById('paid-amount').value;
     const payload = {
@@ -267,10 +259,15 @@
       discount_type: document.getElementById('invoice-discount-type').value,
       discount_value: document.getElementById('invoice-discount-value').value,
       tax: document.getElementById('invoice-tax').value,
-      paid_amount: paidField === '' ? money(totals.total) : paidField,
+      paid_amount: forDraft ? (paidField || '0') : (paidField === '' ? money(totals.total) : paidField),
       payment_method: document.getElementById('payment-method').value,
     };
-    fetch(config.checkoutUrl, {
+    if (saleId) payload.sale_id = saleId;
+    return payload;
+  }
+
+  function postSale(url, payload, onOk) {
+    fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
@@ -282,17 +279,76 @@
       .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
       .then(function (result) {
         if (!result.ok) {
-          errorEl.textContent = result.data.error || 'Could not complete the sale.';
-          errorEl.hidden = false;
+          showError(result.data.error || 'Could not save the order.');
           return;
         }
-        window.location.href = result.data.invoice_url;
+        onOk(result.data);
       })
       .catch(function () {
-        errorEl.textContent = 'Could not complete the sale.';
-        errorEl.hidden = false;
+        showError('Could not save the order.');
       });
+  }
+
+  function loadDraft(draft) {
+    if (!draft) return;
+    saleId = draft.sale_id || null;
+    document.getElementById('customer-phone').value = draft.customer_phone || '';
+    document.getElementById('customer-name').value = draft.customer_name || '';
+    document.getElementById('customer-email').value = draft.customer_email || '';
+    document.getElementById('customer-address').value = draft.customer_address || '';
+    document.getElementById('invoice-discount-type').value = draft.discount_type || 'fixed';
+    document.getElementById('invoice-discount-value').value = draft.discount_value || '0';
+    document.getElementById('invoice-tax').value = draft.tax || '0';
+    document.getElementById('payment-method').value = draft.payment_method || 'cash';
+    document.getElementById('paid-amount').value = Number(draft.paid_amount) ? draft.paid_amount : '';
+    (draft.items || []).forEach(function (item) {
+      cart.push({
+        product_unit_id: item.product_unit_id,
+        sku: item.sku,
+        name: item.name,
+        unit: item.unit,
+        base_unit: item.base_unit,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        discount_type: item.discount_type || 'fixed',
+        discount_value: item.discount_value || 0,
+        conversion_to_base: item.conversion_to_base,
+        stock_on_hand: item.stock_on_hand,
+        stock_status: item.stock_status,
+      });
+    });
+  }
+
+  document.getElementById('checkout-btn').addEventListener('click', function () {
+    showError('');
+    if (!config.allowNegativeStock) {
+      const oversold = cart.find(function (item) {
+        return neededBase(item, item.quantity) > availableBase(item);
+      });
+      if (oversold) {
+        showError('Not enough stock for ' + oversold.name + ' (' + oversold.stock_on_hand + ' ' + oversold.base_unit + ' on hand).');
+        return;
+      }
+    }
+    postSale(config.checkoutUrl, buildPayload(false), function (data) {
+      window.location.href = data.invoice_url;
+    });
   });
+
+  document.getElementById('draft-btn').addEventListener('click', function () {
+    showError('');
+    postSale(config.draftUrl, buildPayload(true), function (data) {
+      window.location.href = data.day_url || config.dayUrl;
+    });
+  });
+
+  if (draftEl) {
+    try {
+      loadDraft(JSON.parse(draftEl.textContent));
+    } catch (err) {
+      showError('Could not load the draft order.');
+    }
+  }
 
   searchProducts('');
   renderCart();

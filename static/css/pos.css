@@ -3,6 +3,17 @@
   padding: 1rem 1.25rem 2rem;
 }
 
+.pos-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.pos-toolbar a { color: var(--accent); font-weight: 700; }
+
 .pos-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(22rem, 0.9fr);
@@ -138,6 +149,8 @@
   font-weight: 700;
   cursor: pointer;
 }
+.checkout.secondary { background: #44403c; }
+.ticket-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
 
 .pos-error { color: #b91c1c; }
 .recent-invoices { padding-left: 1.1rem; color: var(--muted); }

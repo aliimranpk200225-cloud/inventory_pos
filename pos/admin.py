@@ -4,7 +4,7 @@ from django.db import transaction
 from inventory.models import PostingStatus
 from inventory.stock import sync_sale_stock
 
-from .models import Customer, Sale, SaleItem
+from .models import CashMovement, CashSession, Customer, Sale, SaleItem
 
 
 @admin.register(Customer)
@@ -39,12 +39,13 @@ class SaleAdmin(admin.ModelAdmin):
         'total',
         'payment_status',
         'status',
+        'cash_session',
         'cashier',
         'created_at',
     )
     list_filter = ('status', 'payment_status', 'payment_method', 'created_at')
     search_fields = ('invoice_number', 'customer_name', 'customer_phone')
-    autocomplete_fields = ('customer',)
+    autocomplete_fields = ('customer', 'cash_session')
     exclude = ('cashier',)
     readonly_fields = (
         'invoice_number',
@@ -75,3 +76,62 @@ class SaleAdmin(admin.ModelAdmin):
         sale = form.instance
         sale.refresh_from_db()
         sync_sale_stock(sale, request.user)
+
+
+class CashMovementInline(admin.TabularInline):
+    model = CashMovement
+    extra = 0
+    autocomplete_fields = ('sale',)
+    readonly_fields = ('created_at',)
+
+    def has_add_permission(self, request, obj=None):
+        return bool(obj and obj.is_open)
+
+
+@admin.register(CashSession)
+class CashSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'cashier',
+        'opened_at',
+        'status',
+        'opening_cash',
+        'cash_sales',
+        'card_sales',
+        'expected_closing_cash',
+        'actual_closing_cash',
+        'cash_difference',
+    )
+    list_filter = ('status', 'opened_at')
+    search_fields = ('cashier__username', 'id')
+    autocomplete_fields = ('cashier',)
+    date_hierarchy = 'opened_at'
+    readonly_fields = (
+        'cashier',
+        'opened_at',
+        'closed_at',
+        'cash_sales',
+        'card_sales',
+        'other_sales',
+        'refunds',
+        'cash_in',
+        'cash_out',
+        'expenses',
+        'expected_closing_cash',
+        'cash_difference',
+        'completed_orders',
+        'cancelled_orders',
+        'draft_orders',
+    )
+    inlines = (CashMovementInline,)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        if obj and not obj.is_open:
+            return False
+        return super().has_change_permission(request, obj)

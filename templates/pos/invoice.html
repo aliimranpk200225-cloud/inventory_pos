@@ -22,6 +22,7 @@
 
 {% block content %}
   <div class="actions">
+    <a href="{% url 'pos:day' %}">POS day</a>
     <a href="{% url 'pos:counter' %}">New sale</a>
     <button type="button" onclick="window.print()">Print</button>
   </div>

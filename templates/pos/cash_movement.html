@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Inventory POS{% endblock %}
+
+{% block content %}
+  <h1>{{ title }}</h1>
+  <form method="post" class="form-card">
+    {% csrf_token %}
+    <label>
+      {{ form.amount.label }}
+      {{ form.amount }}
+    </label>
+    {{ form.amount.errors }}
+    {% if show_type %}
+      <label>
+        Type
+        {{ form.movement_type }}
+      </label>
+    {% endif %}
+    {% if show_payment_method %}
+      <label>
+        {{ form.payment_method.label }}
+        {{ form.payment_method }}
+      </label>
+    {% endif %}
+    <label>
+      {{ form.reason.label }}
+      {{ form.reason }}
+    </label>
+    <button type="submit" class="btn">Save</button>
+    <a class="btn btn-secondary" href="{% url 'pos:day' %}">Cancel</a>
+  </form>
+{% endblock %}

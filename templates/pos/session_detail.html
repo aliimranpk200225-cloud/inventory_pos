@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load pos_extras %}
+
+{% block title %}POS Day {{ session.opened_at|date:"d-M-Y" }} — Inventory POS{% endblock %}
+
+{% block content %}
+  <div class="page-head">
+    <div>
+      <h1>POS day {{ session.opened_at|date:"d-M-Y" }}</h1>
+      <p class="lede">
+        Cashier: {{ session.cashier }}
+        · Opened {{ session.opened_at|date:"d-M-Y H:i" }}
+        {% if session.closed_at %}· Closed {{ session.closed_at|date:"d-M-Y H:i" }}{% endif %}
+        · <span class="badge {% if session.is_open %}badge-ok{% else %}badge-low{% endif %}">{{ session.get_status_display }}</span>
+      </p>
+    </div>
+    <a class="btn btn-secondary" href="{% url 'pos:session_list' %}">All days</a>
+  </div>
+
+  <section class="stats">
+    <article class="stat">
+      <span class="stat-value">{{ totals.opening_cash|rs }}</span>
+      <span class="stat-label">Opening cash</span>
+    </article>
+    <article class="stat">
+      <span class="stat-value">{{ totals.total_sales|rs }}</span>
+      <span class="stat-label">Sales</span>
+    </article>
+    <article class="stat">
+      <span class="stat-value">{{ totals.expected_closing_cash|rs }}</span>
+      <span class="stat-label">Expected cash</span>
+    </article>
+    <article class="stat">
+      <span class="stat-value">{{ totals.actual_closing_cash|rs }}</span>
+      <span class="stat-label">Actual cash</span>
+    </article>
+    <article class="stat{% if totals.cash_difference and totals.cash_difference < 0 %} danger{% endif %}">
+      <span class="stat-value">{{ totals.cash_difference|rs }}</span>
+      <span class="stat-label">Difference</span>
+    </article>
+  </section>
+
+  <table class="summary-table">
+    <tbody>
+      <tr><th>Cash sales</th><td>Rs. {{ totals.cash_sales|rs }}</td></tr>
+      <tr><th>Card sales</th><td>Rs. {{ totals.card_sales|rs }}</td></tr>
+      <tr><th>Other sales</th><td>Rs. {{ totals.other_sales|rs }}</td></tr>
+      <tr><th>Refunds</th><td>Rs. {{ totals.refunds|rs }}</td></tr>
+      <tr><th>Cash in</th><td>Rs. {{ totals.cash_in|rs }}</td></tr>
+      <tr><th>Cash out</th><td>Rs. {{ totals.cash_out|rs }}</td></tr>
+      <tr><th>Expenses</th><td>Rs. {{ totals.expenses|rs }}</td></tr>
+      <tr><th>Orders</th><td>{{ totals.order_count }}</td></tr>
+      <tr><th>Completed</th><td>{{ totals.completed_orders }}</td></tr>
+      <tr><th>Cancelled</th><td>{{ totals.cancelled_orders }}</td></tr>
+      <tr><th>Drafts</th><td>{{ totals.draft_orders }}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Orders</h2>
+  {% if sales %}
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Pay</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sale in sales %}
+          <tr>
+            <td>
+              {% if sale.status == 'posted' %}
+                <a href="{% url 'pos:invoice' sale.pk %}">{{ sale.invoice_number }}</a>
+              {% else %}
+                {{ sale.invoice_number }}
+              {% endif %}
+            </td>
+            <td>{{ sale.customer_name|default:"Walk-in" }}</td>
+            <td>{{ sale.get_status_display }}</td>
+            <td>{{ sale.get_payment_method_display }}</td>
+            <td>Rs. {{ sale.total|rs }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="lede">No orders on this day.</p>
+  {% endif %}
+
+  {% if movements %}
+    <h2>Cash movements</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Method</th>
+          <th>Amount</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for move in movements %}
+          <tr>
+            <td>{{ move.created_at|date:"H:i" }}</td>
+            <td>{{ move.get_movement_type_display }}</td>
+            <td>{{ move.get_payment_method_display }}</td>
+            <td>Rs. {{ move.amount|rs }}</td>
+            <td>{{ move.reason|default:"—" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load pos_extras %}
+
+{% block title %}Close POS — Inventory POS{% endblock %}
+
+{% block content %}
+  <h1>POS day summary</h1>
+  <p class="lede">Review today's totals, then count the physical cash in the counter.</p>
+
+  <table class="summary-table">
+    <tbody>
+      <tr><th>Opening cash</th><td>Rs. {{ totals.opening_cash|rs }}</td></tr>
+      <tr><th>Cash sales</th><td>Rs. {{ totals.cash_sales|rs }}</td></tr>
+      <tr><th>Card sales</th><td>Rs. {{ totals.card_sales|rs }}</td></tr>
+      <tr><th>Other sales</th><td>Rs. {{ totals.other_sales|rs }}</td></tr>
+      <tr><th>Refunds</th><td>Rs. {{ totals.refunds|rs }}</td></tr>
+      <tr><th>Cash in</th><td>Rs. {{ totals.cash_in|rs }}</td></tr>
+      <tr><th>Cash out</th><td>Rs. {{ totals.cash_out|rs }}</td></tr>
+      <tr><th>Expenses</th><td>Rs. {{ totals.expenses|rs }}</td></tr>
+      <tr class="grand"><th>Expected cash</th><td>Rs. {{ totals.expected_closing_cash|rs }}</td></tr>
+    </tbody>
+  </table>
+  <p class="lede">Expected cash = opening + cash sales + cash in − cash refunds − cash out − expenses. Card sales do not add to the drawer.</p>
+
+  <form method="post" class="form-card">
+    {% csrf_token %}
+    <label>
+      {{ form.amount.label }}
+      {{ form.amount }}
+    </label>
+    {{ form.amount.errors }}
+    <button type="submit" class="btn btn-danger">Close session</button>
+    <a class="btn btn-secondary" href="{% url 'pos:day' %}">Back</a>
+  </form>
+{% endblock %}

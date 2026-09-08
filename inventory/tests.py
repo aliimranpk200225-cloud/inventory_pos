@@ -29,6 +29,7 @@ from inventory.stock import (
 )
 from pos.models import Sale, SaleItem
 from pos.services import CheckoutError, checkout
+from pos.sessions import open_session
 
 
 User = get_user_model()
@@ -298,6 +299,7 @@ class StockLedgerTests(TestCase):
 
     def test_pos_checkout_posts_stock_and_blocks_oversell(self):
         self._purchase([{'unit': self.unit_crate, 'qty': 1}], invoice='PO-POS')
+        open_session(self.user, Decimal('10000.00'))
         sale = checkout(self.user, {
             'items': [{
                 'product_unit_id': self.unit_bottle.pk,

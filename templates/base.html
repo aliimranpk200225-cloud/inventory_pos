@@ -10,14 +10,28 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{% url 'inventory:home' %}">Inventory POS</a>
+    <a class="brand" href="{% url 'pos:home' %}">Inventory POS</a>
     <nav>
-      <a href="{% url 'inventory:home' %}">Dashboard</a>
-      <a href="{% url 'pos:counter' %}">POS</a>
+      <a href="{% url 'pos:home' %}">Home</a>
+      <a href="{% url 'pos:enter' %}">POS</a>
+      <a href="{% url 'inventory:home' %}">Stock</a>
       <a href="{% url 'admin:index' %}">Admin</a>
+      {% if user.is_authenticated %}
+        <form class="logout-form" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit">Log out</button>
+        </form>
+      {% endif %}
     </nav>
   </header>
   <main class="container">
+    {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
   {% block extra_js %}{% endblock %}

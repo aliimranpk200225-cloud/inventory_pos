@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load pos_extras %}
+
+{% block title %}Select Module — Inventory POS{% endblock %}
+
+{% block content %}
+  <h1>Select Module</h1>
+  <p class="lede">Welcome{% if user.get_full_name or user.username %}, {{ user.get_full_name|default:user.username }}{% endif %}. Choose a module to continue.</p>
+
+  <section class="module-grid">
+    <a class="module-card" href="{% url 'pos:enter' %}">
+      <h2>POS</h2>
+      <p>Open the register, take sales, and close the cash session at the end of the day.</p>
+      {% if open_session %}
+        <span class="badge badge-ok">Session open</span>
+      {% endif %}
+    </a>
+  </section>
+
+  {% if previous_sessions %}
+    <section class="stock-alerts">
+      <h2>Previous POS days</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Opening</th>
+            <th>Sales</th>
+            <th>Closing</th>
+            <th>Difference</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for day in previous_sessions %}
+            <tr>
+              <td><a href="{% url 'pos:session_detail' day.pk %}">{{ day.opened_at|date:"d-M-Y" }}</a></td>
+              <td>Rs. {{ day.opening_cash|rs }}</td>
+              <td>Rs. {{ day.total_sales|rs }}</td>
+              <td>Rs. {{ day.actual_closing_cash|rs }}</td>
+              <td>Rs. {{ day.cash_difference|rs }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p><a href="{% url 'pos:session_list' %}">View all cash history</a></p>
+    </section>
+  {% endif %}
+{% endblock %}

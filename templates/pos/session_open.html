@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Start POS Session — Inventory POS{% endblock %}
+
+{% block content %}
+  <h1>Start POS Session</h1>
+  <p class="lede">Cash in counter at start of day. Opening cash is the physical cash already in the register — it is not a sale.</p>
+
+  <form method="post" class="form-card">
+    {% csrf_token %}
+    <label>
+      {{ form.amount.label }}
+      {{ form.amount }}
+    </label>
+    {% if form.amount.help_text %}<p class="lede">{{ form.amount.help_text }}</p>{% endif %}
+    {{ form.amount.errors }}
+    <button type="submit" class="btn">Start Day / Open POS</button>
+  </form>
+{% endblock %}
