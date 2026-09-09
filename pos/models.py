@@ -28,6 +28,7 @@ class Sale(DiscountMixin, models.Model):
     class PaymentMethod(models.TextChoices):
         CASH = 'cash', 'Cash'
         CARD = 'card', 'Card'
+        BANK = 'bank', 'Bank Transfer'
         OTHER = 'other', 'Other'
 
     class PaymentStatus(models.TextChoices):
@@ -90,6 +91,13 @@ class Sale(DiscountMixin, models.Model):
     @property
     def applied_discount(self):
         return self.discount_amount(self.subtotal)
+
+    @property
+    def change_amount(self):
+        extra = self.paid_amount - self.total
+        if extra > 0:
+            return extra.quantize(Decimal('0.01'))
+        return Decimal('0.00')
 
     def save(self, *args, **kwargs):
         if not self.invoice_number:
@@ -170,6 +178,7 @@ class CashSession(models.Model):
     opening_cash = models.DecimalField(max_digits=12, decimal_places=2)
     cash_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     card_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bank_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     other_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     refunds = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     cash_in = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -211,7 +220,7 @@ class CashSession(models.Model):
 
     @property
     def total_sales(self):
-        return self.cash_sales + self.card_sales + self.other_sales
+        return self.cash_sales + self.card_sales + self.bank_sales + self.other_sales
 
 
 class CashMovement(models.Model):

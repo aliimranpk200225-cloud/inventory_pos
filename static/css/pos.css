@@ -1,5 +1,6 @@
 .container:has(.pos-layout) {
-  max-width: none;
+  max-width: none !important;
+  width: 100%;
   padding: 1rem 1.25rem 2rem;
 }
 
@@ -16,7 +17,7 @@
 
 .pos-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(22rem, 0.9fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(28rem, 1.05fr);
   gap: 1.25rem;
   align-items: start;
 }
@@ -114,13 +115,50 @@
   border-radius: 6px;
 }
 
-.cart-table { font-size: 0.9rem; }
-.cart-table input,
+.cart-table { font-size: 0.9rem; width: 100%; }
+.cart-table th,
+.cart-table td { vertical-align: top; padding: 0.4rem 0.28rem; }
+.cart-table input:not(.btn-check),
 .cart-table select {
   width: 100%;
   min-width: 3.5rem;
   font: inherit;
   padding: 0.25rem;
+}
+.cart-table .qty-cell {
+  white-space: nowrap;
+}
+.cart-table .qty-cell .qty {
+  width: 4.25rem;
+  max-width: 4.25rem;
+  display: inline-block;
+}
+.cart-table .price {
+  min-width: 3.25rem;
+  max-width: 4.75rem;
+}
+.cart-table .qty-unit {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 0.15rem;
+}
+.item-disc-cell { min-width: 11.5rem; }
+.item-disc {
+  display: grid;
+  gap: 0.28rem;
+  justify-items: start;
+}
+.item-disc .btn-group { row-gap: 0.2rem; }
+.item-disc .btn {
+  --bs-btn-padding-y: 0.12rem;
+  --bs-btn-padding-x: 0.32rem;
+  --bs-btn-font-size: 0.68rem;
+  --bs-btn-line-height: 1.2;
+}
+.item-disc .item-custom-disc { max-width: 8.5rem; }
+.item-disc .input-group-text {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.35rem;
 }
 
 .cart-table .empty-cart td { color: var(--muted); }
@@ -132,10 +170,16 @@
   font: inherit;
 }
 
-.totals { display: grid; gap: 0.6rem; margin-top: 1rem; }
-.totals dl { margin: 0; }
-.totals dl div { display: flex; justify-content: space-between; padding: 0.15rem 0; }
-.totals .grand { font-weight: 700; font-size: 1.15rem; }
+.pay-summary { margin: 0; }
+.pay-summary > div { display: flex; justify-content: space-between; padding: 0.2rem 0; font-size: 0.9rem; }
+.pay-summary dt { font-weight: 500; color: var(--muted); }
+.pay-summary dd { margin: 0; font-weight: 600; }
+.pay-summary .grand { font-size: 1.05rem; border-top: 1px solid var(--line); margin-top: 0.35rem; padding-top: 0.45rem; }
+.pay-summary .grand dt, .pay-summary .grand dd { color: var(--ink); font-weight: 700; }
+.pay-summary .is-due dt, .pay-summary .is-due dd { color: #b91c1c; }
+.pay-summary .is-change dt, .pay-summary .is-change dd { color: #0f766e; }
+.pos-ticket .btn-group { row-gap: 0.35rem; }
+.pos-ticket .card { border-color: var(--line); }
 
 .checkout {
   width: 100%;

@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from functools import wraps
 
 from django.conf import settings
@@ -86,6 +87,7 @@ def _draft_payload(sale):
             'discount_value': str(item.discount_value),
             'conversion_to_base': str(unit.conversion_to_base),
             'stock_on_hand': format_quantity(on_hand),
+            'stock_in_unit': format_quantity(on_hand / (unit.conversion_to_base or Decimal('1'))),
             'stock_status': classify_stock(on_hand, unit.product.min_stock),
         })
     return {
@@ -235,7 +237,9 @@ def product_search(request):
     results = []
     for unit in units:
         on_hand = stock_by_product.get(unit.product_id) or 0
-        conversion = unit.conversion_to_base or 1
+        conversion = unit.conversion_to_base or Decimal('1')
+        if conversion <= 0:
+            conversion = Decimal('1')
         status = classify_stock(on_hand, unit.product.min_stock)
         results.append({
             'id': unit.pk,

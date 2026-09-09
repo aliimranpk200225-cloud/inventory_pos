@@ -12,6 +12,7 @@
       <tr><th>Opening cash</th><td>Rs. {{ totals.opening_cash|rs }}</td></tr>
       <tr><th>Cash sales</th><td>Rs. {{ totals.cash_sales|rs }}</td></tr>
       <tr><th>Card sales</th><td>Rs. {{ totals.card_sales|rs }}</td></tr>
+      <tr><th>Bank transfer</th><td>Rs. {{ totals.bank_sales|rs }}</td></tr>
       <tr><th>Other sales</th><td>Rs. {{ totals.other_sales|rs }}</td></tr>
       <tr><th>Refunds</th><td>Rs. {{ totals.refunds|rs }}</td></tr>
       <tr><th>Cash in</th><td>Rs. {{ totals.cash_in|rs }}</td></tr>
@@ -20,7 +21,7 @@
       <tr class="grand"><th>Expected cash</th><td>Rs. {{ totals.expected_closing_cash|rs }}</td></tr>
     </tbody>
   </table>
-  <p class="lede">Expected cash = opening + cash sales + cash in − cash refunds − cash out − expenses. Card sales do not add to the drawer.</p>
+  <p class="lede">Expected cash = opening + cash sales + cash in − cash refunds − cash out − expenses. Card, bank transfer, and other payments do not add to the drawer.</p>
 
   <form method="post" class="form-card">
     {% csrf_token %}

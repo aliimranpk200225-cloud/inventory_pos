@@ -38,6 +38,7 @@ def compute_totals(session):
     }
     cash_sales = sales_by_method.get(Sale.PaymentMethod.CASH, Decimal('0.00'))
     card_sales = sales_by_method.get(Sale.PaymentMethod.CARD, Decimal('0.00'))
+    bank_sales = sales_by_method.get(Sale.PaymentMethod.BANK, Decimal('0.00'))
     other_sales = sales_by_method.get(Sale.PaymentMethod.OTHER, Decimal('0.00'))
 
     movements = session.movements.values('movement_type', 'payment_method').annotate(total=Sum('amount'))
@@ -72,8 +73,9 @@ def compute_totals(session):
         'opening_cash': opening,
         'cash_sales': cash_sales,
         'card_sales': card_sales,
+        'bank_sales': bank_sales,
         'other_sales': other_sales,
-        'total_sales': cash_sales + card_sales + other_sales,
+        'total_sales': cash_sales + card_sales + bank_sales + other_sales,
         'refunds': refunds,
         'cash_refunds': cash_refunds,
         'cash_in': cash_in,
@@ -93,6 +95,7 @@ def apply_totals_snapshot(session, totals=None):
     totals = totals or compute_totals(session)
     session.cash_sales = totals['cash_sales']
     session.card_sales = totals['card_sales']
+    session.bank_sales = totals['bank_sales']
     session.other_sales = totals['other_sales']
     session.refunds = totals['refunds']
     session.cash_in = totals['cash_in']
@@ -112,6 +115,7 @@ def display_totals(session):
             'opening_cash': _money(session.opening_cash),
             'cash_sales': _money(session.cash_sales),
             'card_sales': _money(session.card_sales),
+            'bank_sales': _money(session.bank_sales),
             'other_sales': _money(session.other_sales),
             'total_sales': session.total_sales,
             'refunds': _money(session.refunds),

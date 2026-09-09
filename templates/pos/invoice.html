@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load pos_extras %}
 
 {% block title %}{{ sale.invoice_number }} — Inventory POS{% endblock %}
 
@@ -8,6 +9,8 @@
     .invoice header { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
     .invoice h1 { margin: 0 0 0.25rem; }
     .muted { color: var(--muted); }
+    .invoice .item-name { font-weight: 600; }
+    .invoice .item-meta { color: var(--muted); font-size: 0.9rem; margin-top: 0.15rem; }
     .invoice .totals { margin-left: auto; width: 16rem; }
     .invoice .totals div { display: flex; justify-content: space-between; padding: 0.25rem 0; }
     .invoice .totals .grand { font-weight: 700; border-top: 1px solid var(--line); margin-top: 0.5rem; padding-top: 0.5rem; }
@@ -47,7 +50,6 @@
     <table>
       <thead>
         <tr>
-          <th>SKU</th>
           <th>Item</th>
           <th>Qty</th>
           <th>Price</th>
@@ -58,37 +60,42 @@
       <tbody>
         {% for item in sale.items.all %}
           <tr>
-            <td>{{ item.product_unit.product.sku }}</td>
-            <td>{{ item.product_unit.product.name }} ({{ item.product_unit.unit }})</td>
-            <td>{{ item.quantity }}</td>
-            <td>{{ item.unit_price }}</td>
+            <td>
+              <div class="item-name">{{ item.product_unit.product.name }}</div>
+              <div class="item-meta">{{ item.product_unit.product.sku }} · {{ item.product_unit.unit.abbreviation }}</div>
+            </td>
+            <td>{{ item.quantity|qty }} {{ item.product_unit.unit.abbreviation }}</td>
+            <td>Rs. {{ item.unit_price|rs }}</td>
             <td>
               {% if item.discount_value %}
-                {% if item.discount_type == 'percent' %}{{ item.discount_value }}%{% else %}Rs. {{ item.discount_value }}{% endif %}
-                ({{ item.applied_discount }})
+                {% if item.discount_type == 'percent' %}{{ item.discount_value|qty }}%{% else %}Rs. {{ item.discount_value|rs }}{% endif %}
+                (Rs. {{ item.applied_discount|rs }})
               {% else %}
                 —
               {% endif %}
             </td>
-            <td>{{ item.total }}</td>
+            <td>Rs. {{ item.total|rs }}</td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
     <div class="totals">
-      <div><span>Subtotal</span><span>{{ sale.subtotal }}</span></div>
+      <div><span>Subtotal</span><span>Rs. {{ sale.subtotal|rs }}</span></div>
       <div>
         <span>Invoice discount
           {% if sale.discount_value %}
-            ({% if sale.discount_type == 'percent' %}{{ sale.discount_value }}%{% else %}Rs. {{ sale.discount_value }}{% endif %})
+            ({% if sale.discount_type == 'percent' %}{{ sale.discount_value|qty }}%{% else %}Rs. {{ sale.discount_value|rs }}{% endif %})
           {% endif %}
         </span>
-        <span>{{ sale.applied_discount }}</span>
+        <span>Rs. {{ sale.applied_discount|rs }}</span>
       </div>
-      <div><span>Tax</span><span>{{ sale.tax }}</span></div>
-      <div class="grand"><span>Total</span><span>Rs. {{ sale.total }}</span></div>
-      <div><span>Paid ({{ sale.get_payment_method_display }})</span><span>{{ sale.paid_amount }}</span></div>
-      <div><span>Due</span><span>{{ sale.due_amount }}</span></div>
+      <div><span>Tax</span><span>Rs. {{ sale.tax|rs }}</span></div>
+      <div class="grand"><span>Total</span><span>Rs. {{ sale.total|rs }}</span></div>
+      <div><span>Paid ({{ sale.get_payment_method_display }})</span><span>Rs. {{ sale.paid_amount|rs }}</span></div>
+      <div><span>Due</span><span>Rs. {{ sale.due_amount|rs }}</span></div>
+      {% if sale.change_amount %}
+        <div class="grand"><span>Balance</span><span>Rs. {{ sale.change_amount|rs }}</span></div>
+      {% endif %}
     </div>
     {% if sale.notes %}<p>Notes: {{ sale.notes }}</p>{% endif %}
   </article>

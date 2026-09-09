@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, time
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -63,8 +63,17 @@ STOCK_LOW = 'low'
 STOCK_OUT = 'out'
 
 
-def format_quantity(value):
-    text = format(Decimal(str(value or 0)), 'f')
+def format_quantity(value, places=2):
+    """Format a quantity for display without repeating-decimal noise.
+
+    Internal stock math keeps full precision; this is only for UI/invoice text.
+    """
+    try:
+        amount = Decimal(str(value or 0))
+    except Exception:
+        amount = Decimal('0')
+    step = Decimal('1').scaleb(-int(places))
+    text = format(amount.quantize(step, rounding=ROUND_HALF_UP), 'f')
     if '.' in text:
         text = text.rstrip('0').rstrip('.')
     return text or '0'

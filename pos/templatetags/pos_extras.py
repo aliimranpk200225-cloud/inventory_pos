@@ -2,7 +2,14 @@ from decimal import Decimal, InvalidOperation
 
 from django import template
 
+from inventory.stock import format_quantity
+
 register = template.Library()
+
+
+@register.filter
+def qty(value):
+    return format_quantity(value)
 
 
 @register.filter

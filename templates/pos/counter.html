@@ -5,6 +5,7 @@
 {% block title %}POS Counter — Inventory POS{% endblock %}
 
 {% block extra_css %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="{% static 'css/pos.css' %}">
 {% endblock %}
 
@@ -56,35 +57,108 @@
         </tbody>
       </table>
 
-      <div class="totals">
-        <label>Invoice discount
-          <select id="invoice-discount-type">
-            <option value="fixed">Rs.</option>
-            <option value="percent">%</option>
-          </select>
-          <input id="invoice-discount-value" type="number" min="0" step="0.01" value="0">
-        </label>
-        <label>Tax (Rs.) <input id="invoice-tax" type="number" min="0" step="0.01" value="0"></label>
-        <label>Payment
-          <select id="payment-method">
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label>Paid (Rs.) <input id="paid-amount" type="number" min="0" step="0.01" placeholder="Full amount"></label>
-        <dl>
-          <div><dt>Subtotal</dt><dd id="sum-subtotal">0.00</dd></div>
-          <div><dt>Invoice discount</dt><dd id="sum-discount">0.00</dd></div>
-          <div><dt>Tax</dt><dd id="sum-tax">0.00</dd></div>
-          <div class="grand"><dt>Total</dt><dd id="sum-total">0.00</dd></div>
-        </dl>
+      <input type="hidden" id="invoice-discount-type" value="fixed">
+      <input type="hidden" id="invoice-discount-value" value="0">
+
+      <div class="card mb-2">
+        <div class="card-body p-2">
+          <div class="small fw-semibold mb-2">Discount</div>
+          <div class="mb-2">
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="radio" name="discount-type-ui" id="disc-type-percent" value="percent">
+              <label class="form-check-label" for="disc-type-percent">Percentage</label>
+            </div>
+            <div class="form-check form-check-inline mb-0">
+              <input class="form-check-input" type="radio" name="discount-type-ui" id="disc-type-fixed" value="fixed" checked>
+              <label class="form-check-label" for="disc-type-fixed">Fixed Amount</label>
+            </div>
+          </div>
+
+          <div id="percent-presets" class="d-none">
+            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Percentage discount">
+              <input type="radio" class="btn-check" name="percent-preset" id="pct-0" value="0" checked>
+              <label class="btn btn-outline-primary" for="pct-0">0%</label>
+              <input type="radio" class="btn-check" name="percent-preset" id="pct-5" value="5">
+              <label class="btn btn-outline-primary" for="pct-5">5%</label>
+              <input type="radio" class="btn-check" name="percent-preset" id="pct-10" value="10">
+              <label class="btn btn-outline-primary" for="pct-10">10%</label>
+              <input type="radio" class="btn-check" name="percent-preset" id="pct-15" value="15">
+              <label class="btn btn-outline-primary" for="pct-15">15%</label>
+              <input type="radio" class="btn-check" name="percent-preset" id="pct-20" value="20">
+              <label class="btn btn-outline-primary" for="pct-20">20%</label>
+              <input type="radio" class="btn-check" name="percent-preset" id="pct-custom" value="custom">
+              <label class="btn btn-outline-primary" for="pct-custom">Custom</label>
+            </div>
+          </div>
+
+          <div id="fixed-presets">
+            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Fixed discount">
+              <input type="radio" class="btn-check" name="fixed-preset" id="fix-50" value="50">
+              <label class="btn btn-outline-primary" for="fix-50">Rs.50</label>
+              <input type="radio" class="btn-check" name="fixed-preset" id="fix-100" value="100">
+              <label class="btn btn-outline-primary" for="fix-100">Rs.100</label>
+              <input type="radio" class="btn-check" name="fixed-preset" id="fix-200" value="200">
+              <label class="btn btn-outline-primary" for="fix-200">Rs.200</label>
+              <input type="radio" class="btn-check" name="fixed-preset" id="fix-500" value="500">
+              <label class="btn btn-outline-primary" for="fix-500">Rs.500</label>
+              <input type="radio" class="btn-check" name="fixed-preset" id="fix-custom" value="custom">
+              <label class="btn btn-outline-primary" for="fix-custom">Custom</label>
+            </div>
+          </div>
+
+          <div id="custom-discount" class="input-group input-group-sm mt-2 d-none">
+            <span class="input-group-text" id="custom-discount-prefix">Rs.</span>
+            <input id="custom-discount-input" class="form-control" type="number" min="0" step="0.01" value="0" placeholder="Amount">
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-2">
+        <div class="card-body p-2">
+          <div class="small fw-semibold mb-2">Payment</div>
+          <div class="mb-2">
+            <div class="small fw-semibold mb-2">Payment Method</div>
+            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Payment method">
+              <input type="radio" class="btn-check" name="payment_method" id="pay-cash" value="cash" checked>
+              <label class="btn btn-outline-primary" for="pay-cash">Cash</label>
+              <input type="radio" class="btn-check" name="payment_method" id="pay-card" value="card">
+              <label class="btn btn-outline-primary" for="pay-card">Card</label>
+              <input type="radio" class="btn-check" name="payment_method" id="pay-bank" value="bank">
+              <label class="btn btn-outline-primary" for="pay-bank">Bank Transfer</label>
+              <input type="radio" class="btn-check" name="payment_method" id="pay-other" value="other">
+              <label class="btn btn-outline-primary" for="pay-other">Other</label>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1" for="invoice-tax">Tax</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rs.</span>
+              <input id="invoice-tax" class="form-control" type="number" min="0" step="0.01" value="0">
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1" for="paid-amount">Paid</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">Rs.</span>
+              <input id="paid-amount" class="form-control" type="number" min="0" step="0.01" placeholder="Full amount">
+            </div>
+          </div>
+          <dl class="pay-summary mb-0">
+            <div><dt>Subtotal</dt><dd>Rs. <span id="sum-subtotal">0.00</span></dd></div>
+            <div><dt>Discount</dt><dd>Rs. <span id="sum-discount">0.00</span></dd></div>
+            <div><dt>Tax</dt><dd>Rs. <span id="sum-tax">0.00</span></dd></div>
+            <div class="grand"><dt>Total</dt><dd>Rs. <span id="sum-total">0.00</span></dd></div>
+            <div><dt>Paid</dt><dd>Rs. <span id="sum-paid">0.00</span></dd></div>
+            <div id="row-due"><dt>Due</dt><dd>Rs. <span id="sum-due">0.00</span></dd></div>
+            <div id="row-change"><dt>Balance</dt><dd>Rs. <span id="sum-change">0.00</span></dd></div>
+          </dl>
+        </div>
       </div>
 
       <p id="pos-error" class="pos-error" hidden></p>
-      <div class="ticket-actions">
-        <button id="draft-btn" type="button" class="checkout secondary">Save draft</button>
-        <button id="checkout-btn" type="button" class="checkout">Complete sale</button>
+      <div class="d-grid gap-2" style="grid-template-columns: 1fr 1fr;">
+        <button id="draft-btn" type="button" class="btn btn-outline-secondary">Save draft</button>
+        <button id="checkout-btn" type="button" class="btn btn-primary">Complete sale</button>
       </div>
 
       {% if recent_sales %}
@@ -116,5 +190,6 @@
       allowNegativeStock: {% if allow_negative_stock %}true{% else %}false{% endif %}
     };
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="{% static 'js/pos.js' %}"></script>
 {% endblock %}

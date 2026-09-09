@@ -33,6 +33,13 @@ def _qty(value):
     return qty
 
 
+def _payment_method(value):
+    method = value or Sale.PaymentMethod.CASH
+    if method not in Sale.PaymentMethod.values:
+        raise CheckoutError('Invalid payment method.')
+    return method
+
+
 def _discount_type(value):
     if value in ('fixed', 'percent', '', None):
         return value or 'fixed'
@@ -95,7 +102,7 @@ def _apply_header(sale, user, session, payload, customer):
     ).strip()
     sale.cashier = user
     sale.cash_session = session
-    sale.payment_method = payload.get('payment_method') or Sale.PaymentMethod.CASH
+    sale.payment_method = _payment_method(payload.get('payment_method'))
     sale.discount_type = _discount_type(payload.get('discount_type'))
     sale.discount_value = _money(payload.get('discount_value'))
     sale.tax = _money(payload.get('tax'))

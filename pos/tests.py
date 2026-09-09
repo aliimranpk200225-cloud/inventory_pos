@@ -53,6 +53,46 @@ class ProductSearchStockTests(TestCase):
         self.assertEqual(row['stock_in_unit'], '0')
         self.assertEqual(row['base_unit'], 'Btl')
 
+    def test_product_search_formats_converted_stock(self):
+        carton = Unit.objects.create(name='Carton', abbreviation='crt')
+        pack = ProductUnit.objects.create(
+            product=self.product,
+            unit=carton,
+            conversion_to_base=Decimal('24'),
+            purchase_price=Decimal('240.00'),
+            retail_price=Decimal('1100.00'),
+            wholesale_price=Decimal('1000.00'),
+        )
+        supplier = Supplier.objects.create(name='Bottler')
+        purchase = Purchase.objects.create(
+            supplier=supplier,
+            invoice_number='PO-CONV',
+            purchase_date=date.today(),
+            created_by=self.user,
+            status=PostingStatus.POSTED,
+        )
+        PurchaseItem.objects.create(
+            purchase=purchase,
+            product_unit=self.unit,
+            quantity=Decimal('200'),
+            unit_price=Decimal('10.00'),
+        )
+        from inventory.stock import sync_purchase_stock
+        sync_purchase_stock(purchase, self.user)
+        response = self.client.get('/pos/products/')
+        rows = {row['id']: row for row in response.json()['results']}
+        carton_row = rows[pack.pk]
+        self.assertEqual(carton_row['unit'], 'crt')
+        self.assertEqual(carton_row['retail_price'], '1100.00')
+        self.assertEqual(carton_row['stock_on_hand'], '200')
+        self.assertEqual(carton_row['stock_in_unit'], '8.33')
+        self.assertNotIn('8.333333', carton_row['stock_in_unit'])
+        self.assertEqual(carton_row['conversion_to_base'], '24.0000')
+        bottle_row = rows[self.unit.pk]
+        self.assertEqual(bottle_row['unit'], 'Btl')
+        self.assertEqual(bottle_row['stock_on_hand'], '200')
+        self.assertEqual(bottle_row['stock_in_unit'], '200')
+
 
 class CashSessionTests(TestCase):
     def setUp(self):
@@ -230,3 +270,209 @@ class CashSessionTests(TestCase):
         other_session = open_session(self.other, Decimal('8000'))
         self.assertEqual(other_session.cashier, self.other)
         self.assertEqual(CashSession.objects.filter(status='open').count(), 2)
+
+    def test_overpayment_saves_balance_and_zero_due(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '500.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '1000',
+        })
+        self.assertEqual(sale.total, Decimal('500.00'))
+        self.assertEqual(sale.paid_amount, Decimal('1000.00'))
+        self.assertEqual(sale.due_amount, Decimal('0.00'))
+        self.assertEqual(sale.change_amount, Decimal('500.00'))
+        self.assertEqual(sale.payment_status, Sale.PaymentStatus.PAID)
+        response = self.client.get(reverse('pos:invoice', args=[sale.pk]))
+        self.assertContains(response, 'Balance')
+        self.assertContains(response, '500.00')
+
+    def test_invoice_shows_sold_qty_and_unit_not_base_conversion(self):
+        carton = Unit.objects.create(name='Carton', abbreviation='crt')
+        pack = ProductUnit.objects.create(
+            product=self.product,
+            unit=carton,
+            conversion_to_base=Decimal('24'),
+            purchase_price=Decimal('240.00'),
+            retail_price=Decimal('1100.00'),
+            wholesale_price=Decimal('1000.00'),
+        )
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': pack.pk,
+                'quantity': '1',
+                'unit_price': '1100.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '1100',
+        })
+        item = sale.items.get()
+        self.assertEqual(item.quantity, Decimal('1.0000'))
+        self.assertEqual(item.base_quantity, Decimal('24.0000'))
+        self.assertEqual(item.unit_price, Decimal('1100.00'))
+        self.assertEqual(current_stock(self.product), Decimal('76.0000'))
+        response = self.client.get(reverse('pos:invoice', args=[sale.pk]))
+        self.assertContains(response, 'Cola')
+        self.assertContains(response, 'COLA · crt')
+        self.assertContains(response, '1 crt')
+        self.assertContains(response, 'Rs. 1,100.00')
+        self.assertNotContains(response, '8.333333')
+        self.assertNotContains(response, '1.0000')
+        self.assertNotContains(response, '24.0000')
+
+    def test_underpayment_saves_due(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '1000.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '700',
+        })
+        self.assertEqual(sale.total, Decimal('1000.00'))
+        self.assertEqual(sale.paid_amount, Decimal('700.00'))
+        self.assertEqual(sale.due_amount, Decimal('300.00'))
+        self.assertEqual(sale.change_amount, Decimal('0.00'))
+        self.assertEqual(sale.payment_status, Sale.PaymentStatus.PARTIAL)
+
+    def test_invoice_percent_discount_reduces_saved_total(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '1000.00',
+            }],
+            'discount_type': 'percent',
+            'discount_value': '10',
+            'payment_method': 'cash',
+            'paid_amount': '1000',
+        })
+        self.assertEqual(sale.applied_discount, Decimal('100.00'))
+        self.assertEqual(sale.total, Decimal('900.00'))
+        self.assertEqual(sale.change_amount, Decimal('100.00'))
+
+    def test_item_percent_discount_applies_to_line_subtotal(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '2',
+                'unit_price': '550.00',
+                'discount_type': 'percent',
+                'discount_value': '10',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '990',
+        })
+        item = sale.items.get()
+        self.assertEqual(item.discount_type, 'percent')
+        self.assertEqual(item.discount_value, Decimal('10.00'))
+        self.assertEqual(item.applied_discount, Decimal('110.00'))
+        self.assertEqual(item.total, Decimal('990.00'))
+        self.assertEqual(sale.subtotal, Decimal('990.00'))
+        self.assertEqual(sale.applied_discount, Decimal('0.00'))
+        self.assertEqual(sale.total, Decimal('990.00'))
+
+    def test_item_discounts_are_independent_per_line(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [
+                {
+                    'product_unit_id': self.unit.pk,
+                    'quantity': '1',
+                    'unit_price': '550.00',
+                    'discount_type': 'percent',
+                    'discount_value': '10',
+                },
+                {
+                    'product_unit_id': self.unit.pk,
+                    'quantity': '1',
+                    'unit_price': '550.00',
+                    'discount_type': 'fixed',
+                    'discount_value': '50',
+                },
+            ],
+            'payment_method': 'cash',
+            'paid_amount': '995',
+        })
+        totals = list(sale.items.order_by('id').values_list('total', flat=True))
+        self.assertEqual(totals, [Decimal('495.00'), Decimal('500.00')])
+        self.assertEqual(sale.subtotal, Decimal('995.00'))
+        self.assertEqual(sale.total, Decimal('995.00'))
+
+    def test_counter_has_bootstrap_discount_and_balance_ui(self):
+        open_session(self.user, Decimal('10000'))
+        response = self.client.get('/pos/counter/')
+        self.assertContains(response, 'bootstrap@5.3.3')
+        self.assertContains(response, 'Percentage')
+        self.assertContains(response, 'Fixed Amount')
+        self.assertContains(response, 'btn-group')
+        self.assertContains(response, 'btn-outline-primary')
+        self.assertContains(response, 'id="sum-due"')
+        self.assertContains(response, 'id="sum-change"')
+        self.assertContains(response, 'Balance')
+        self.assertContains(response, 'name="payment_method"')
+        self.assertContains(response, 'id="pay-cash"')
+        self.assertContains(response, 'Bank Transfer')
+        self.assertContains(response, 'btn-check')
+        self.assertContains(response, 'static/js/pos.js')
+
+    def test_card_sale_does_not_increase_expected_cash(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '500.00',
+            }],
+            'payment_method': 'card',
+            'paid_amount': '500',
+        })
+        totals = compute_totals(sale.cash_session)
+        self.assertEqual(sale.payment_method, Sale.PaymentMethod.CARD)
+        self.assertEqual(totals['total_sales'], Decimal('500.00'))
+        self.assertEqual(totals['card_sales'], Decimal('500.00'))
+        self.assertEqual(totals['cash_sales'], Decimal('0.00'))
+        self.assertEqual(totals['expected_closing_cash'], Decimal('10000.00'))
+
+    def test_bank_sale_does_not_increase_expected_cash(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '500.00',
+            }],
+            'payment_method': 'bank',
+            'paid_amount': '500',
+        })
+        totals = compute_totals(sale.cash_session)
+        self.assertEqual(sale.payment_method, Sale.PaymentMethod.BANK)
+        self.assertEqual(totals['bank_sales'], Decimal('500.00'))
+        self.assertEqual(totals['expected_closing_cash'], Decimal('10000.00'))
+
+    def test_cash_overpay_increases_expected_cash_by_sale_total(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '500.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '1000',
+        })
+        totals = compute_totals(sale.cash_session)
+        self.assertEqual(sale.change_amount, Decimal('500.00'))
+        self.assertEqual(totals['cash_sales'], Decimal('500.00'))
+        self.assertEqual(totals['expected_closing_cash'], Decimal('10500.00'))
+
+

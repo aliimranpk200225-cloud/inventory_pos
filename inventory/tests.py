@@ -21,6 +21,7 @@ from inventory.models import (
 from inventory.stock import (
     current_stock,
     classify_stock,
+    format_quantity,
     low_stock_products,
     out_of_stock_products,
     sync_adjustment_stock,
@@ -387,6 +388,13 @@ class StockStatusTests(TestCase):
         self.assertEqual(classify_stock(10, 10), 'low')
         self.assertEqual(classify_stock(11, 10), 'ok')
         self.assertEqual(classify_stock(5, 0), 'ok')
+
+    def test_format_quantity_strips_repeating_decimals(self):
+        self.assertEqual(format_quantity(1), '1')
+        self.assertEqual(format_quantity(Decimal('2.00')), '2')
+        self.assertEqual(format_quantity(Decimal('2.50')), '2.5')
+        self.assertEqual(format_quantity(Decimal('200') / Decimal('24')), '8.33')
+        self.assertEqual(format_quantity(Decimal('1.0000')), '1')
 
     def test_low_and_out_queries(self):
         self._post_qty(self.low_product, 4)
