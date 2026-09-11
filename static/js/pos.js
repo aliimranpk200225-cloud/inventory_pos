@@ -300,25 +300,32 @@
     renderCart();
   }
 
+  function productCardMarkup(product) {
+    const statusClass = product.stock_status === 'out' ? ' out-of-stock' : (product.stock_status === 'low' ? ' low-stock' : '');
+    const imageUrl = product.image_url ? String(product.image_url) : '';
+    const imageClass = imageUrl ? ' has-image' : '';
+    const imageStyle = imageUrl
+      ? ' style="--product-image:url(\'' + imageUrl.replace(/\\/g, '/').replace(/'/g, '%27') + '\')"'
+      : '';
+    return (
+      '<button type="button" class="product-card' + statusClass + imageClass + '" data-id="' + product.id + '"' + imageStyle + '>' +
+        '<strong>' + product.name + '</strong>' +
+        '<div class="meta">' + product.sku + ' · ' + product.unit + '</div>' +
+        '<div class="price">Rs. ' + money(product.retail_price) + '</div>' +
+        '<div class="stock-line">' +
+          '<span>' + stockLabel(product) + '</span>' +
+          stockBadge(product.stock_status) +
+        '</div>' +
+      '</button>'
+    );
+  }
+
   function renderProducts(products) {
     if (!products.length) {
       resultsEl.innerHTML = '<p class="lede">No matching products.</p>';
       return;
     }
-    resultsEl.innerHTML = products.map(function (product) {
-      const statusClass = product.stock_status === 'out' ? ' out-of-stock' : (product.stock_status === 'low' ? ' low-stock' : '');
-      return (
-        '<button type="button" class="product-card' + statusClass + '" data-id="' + product.id + '">' +
-          '<strong>' + product.name + '</strong>' +
-          '<div class="meta">' + product.sku + ' · ' + product.unit + '</div>' +
-          '<div class="price">Rs. ' + money(product.retail_price) + '</div>' +
-          '<div class="stock-line">' +
-            '<span>' + stockLabel(product) + '</span>' +
-            stockBadge(product.stock_status) +
-          '</div>' +
-        '</button>'
-      );
-    }).join('');
+    resultsEl.innerHTML = products.map(productCardMarkup).join('');
     resultsEl.querySelectorAll('.product-card').forEach(function (button) {
       button.addEventListener('click', function () {
         const product = products.find(function (row) { return String(row.id) === button.dataset.id; });
@@ -460,8 +467,6 @@
       .then(function (data) {
         if (!data.customer) return;
         document.getElementById('customer-name').value = data.customer.name || '';
-        document.getElementById('customer-email').value = data.customer.email || '';
-        document.getElementById('customer-address').value = data.customer.address || '';
       });
   });
 
@@ -483,8 +488,6 @@
       customer: {
         name: document.getElementById('customer-name').value,
         phone: document.getElementById('customer-phone').value,
-        email: document.getElementById('customer-email').value,
-        address: document.getElementById('customer-address').value,
       },
       items: cart.map(function (item) {
         return {
@@ -533,8 +536,6 @@
     saleId = draft.sale_id || null;
     document.getElementById('customer-phone').value = draft.customer_phone || '';
     document.getElementById('customer-name').value = draft.customer_name || '';
-    document.getElementById('customer-email').value = draft.customer_email || '';
-    document.getElementById('customer-address').value = draft.customer_address || '';
     document.getElementById('invoice-discount-type').value = draft.discount_type || 'fixed';
     document.getElementById('invoice-discount-value').value = draft.discount_value || '0';
     document.getElementById('invoice-tax').value = draft.tax || '0';

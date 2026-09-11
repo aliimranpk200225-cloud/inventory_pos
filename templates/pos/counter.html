@@ -19,7 +19,12 @@
       <span>Card Rs. {{ totals.card_sales|rs }}</span>
       <span>Expected Rs. {{ totals.expected_closing_cash|rs }}</span>
       <span>Orders {{ totals.completed_orders }}</span>
-      <a href="{% url 'pos:orders' %}?status=draft">Drafts</a>
+      <a href="{% url 'pos:orders' %}?status=draft">
+        Drafts
+        {% if totals.draft_orders %}
+          <span class="badge bg-danger" aria-label="{{ totals.draft_orders }} draft orders">{{ totals.draft_orders }}</span>
+        {% endif %}
+      </a>
       <a href="{% url 'pos:session_close' %}">Close POS</a>
     </div>
   {% endif %}
@@ -33,13 +38,21 @@
 
     <aside class="pos-ticket">
       <h2>Invoice</h2>
-      <fieldset class="customer-box">
-        <legend>Customer</legend>
-        <label>Phone <input id="customer-phone" type="tel" placeholder="Look up by phone"></label>
-        <label>Name <input id="customer-name" type="text" placeholder="Walk-in"></label>
-        <label>Email <input id="customer-email" type="email"></label>
-        <label>Address <textarea id="customer-address" rows="2"></textarea></label>
-      </fieldset>
+      <div class="card mb-2">
+        <div class="card-body p-2">
+          <div class="small fw-semibold mb-2">Customer</div>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              <label class="form-label small mb-1" for="customer-name">Customer Name</label>
+              <input id="customer-name" class="form-control form-control-sm" type="text" placeholder="Walk-in" autocomplete="name">
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label small mb-1" for="customer-phone">Phone Number</label>
+              <input id="customer-phone" class="form-control form-control-sm" type="tel" placeholder="Look up by phone" autocomplete="tel">
+            </div>
+          </div>
+        </div>
+      </div>
 
       <table class="cart-table">
         <thead>

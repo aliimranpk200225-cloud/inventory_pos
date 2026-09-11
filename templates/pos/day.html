@@ -45,7 +45,12 @@
 
   <p class="pos-actions">
     <a class="btn" href="{% url 'pos:counter' %}">New sale</a>
-    <a class="btn btn-secondary" href="{% url 'pos:orders' %}?status=draft">Draft orders</a>
+    <a class="btn btn-secondary" href="{% url 'pos:orders' %}?status=draft">
+      Draft orders
+      {% if totals.draft_orders %}
+        <span class="badge bg-danger" aria-label="{{ totals.draft_orders }} draft orders">{{ totals.draft_orders }}</span>
+      {% endif %}
+    </a>
     <a class="btn btn-secondary" href="{% url 'pos:orders' %}?status=posted">Completed orders</a>
     <a class="btn btn-secondary" href="{% url 'pos:cash_in' %}">Cash in</a>
     <a class="btn btn-secondary" href="{% url 'pos:cash_out' %}">Cash out</a>

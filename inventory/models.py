@@ -93,6 +93,12 @@ class Product(models.Model):
     )
     brand = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
+    image = models.ImageField(
+        upload_to='products/',
+        blank=True,
+        null=True,
+        help_text='Optional. Shown as the POS product card background when uploaded.',
+    )
     min_stock = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     active = models.BooleanField(default=True)
 

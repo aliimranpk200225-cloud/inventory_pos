@@ -32,6 +32,16 @@ from .sessions import (
 )
 
 
+def _product_image_url(product):
+    image = getattr(product, 'image', None)
+    if not image:
+        return ''
+    try:
+        return image.url
+    except ValueError:
+        return ''
+
+
 def _wants_json(request):
     content_type = request.headers.get('Content-Type', '')
     accept = request.headers.get('Accept', '')
@@ -257,6 +267,7 @@ def product_search(request):
             'stock_in_unit': format_quantity(on_hand / conversion),
             'min_stock': format_quantity(unit.product.min_stock),
             'stock_status': status,
+            'image_url': _product_image_url(unit.product),
         })
     return JsonResponse({'results': results})
 

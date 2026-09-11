@@ -1,8 +1,10 @@
 from datetime import date
 from decimal import Decimal
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from inventory.models import Category, PostingStatus, Product, ProductUnit, Purchase, PurchaseItem, Supplier, Unit
@@ -52,6 +54,26 @@ class ProductSearchStockTests(TestCase):
         self.assertEqual(row['stock_on_hand'], '0')
         self.assertEqual(row['stock_in_unit'], '0')
         self.assertEqual(row['base_unit'], 'Btl')
+        self.assertEqual(row['image_url'], '')
+        self.assertFalse(self.product.image)
+
+    def test_product_search_returns_image_url_when_uploaded(self):
+        uploaded = SimpleUploadedFile(
+            'cola.png',
+            (
+                b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+                b'\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f'
+                b'\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
+            ),
+            content_type='image/png',
+        )
+        with TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root, MEDIA_URL='/media/'):
+                self.product.image.save('cola.png', uploaded, save=True)
+                response = self.client.get('/pos/products/')
+        row = response.json()['results'][0]
+        self.assertTrue(row['image_url'])
+        self.assertIn('cola', row['image_url'])
 
     def test_product_search_formats_converted_stock(self):
         carton = Unit.objects.create(name='Carton', abbreviation='crt')
@@ -164,6 +186,49 @@ class CashSessionTests(TestCase):
         self.assertIsNotNone(session.opened_at)
         response = self.client.get('/pos/day/')
         self.assertContains(response, '10,000.00')
+
+    def test_day_draft_orders_badge_counts_open_session_drafts(self):
+        open_session(self.user, Decimal('10000'))
+        response = self.client.get('/pos/day/')
+        self.assertContains(response, 'Draft orders')
+        self.assertContains(response, reverse('pos:orders') + '?status=draft')
+        self.assertNotContains(response, 'class="badge bg-danger"')
+
+        draft = self._sale(1, as_draft=True)
+        self._sale(1, payment='cash')
+        response = self.client.get('/pos/day/')
+        self.assertContains(response, 'class="badge bg-danger"')
+        self.assertContains(response, 'aria-label="1 draft orders"')
+
+        self._sale(1, as_draft=True)
+        response = self.client.get('/pos/day/')
+        self.assertContains(response, 'aria-label="2 draft orders"')
+
+        checkout(self.user, {
+            'sale_id': draft.pk,
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '15.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '15',
+        })
+        response = self.client.get('/pos/day/')
+        self.assertContains(response, 'aria-label="1 draft orders"')
+
+        open_session(self.other, Decimal('8000'))
+        save_draft(self.other, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '15.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '0',
+        })
+        response = self.client.get('/pos/day/')
+        self.assertContains(response, 'aria-label="1 draft orders"')
 
     def test_cannot_open_two_sessions(self):
         open_session(self.user, Decimal('10000'))
@@ -424,6 +489,13 @@ class CashSessionTests(TestCase):
         self.assertContains(response, 'Bank Transfer')
         self.assertContains(response, 'btn-check')
         self.assertContains(response, 'static/js/pos.js')
+        self.assertContains(response, 'id="customer-name"')
+        self.assertContains(response, 'id="customer-phone"')
+        self.assertNotContains(response, 'id="customer-email"')
+        self.assertNotContains(response, 'id="customer-address"')
+        self.assertContains(response, 'col-md-6')
+        self.assertContains(response, 'Customer Name')
+        self.assertContains(response, 'Phone Number')
 
     def test_card_sale_does_not_increase_expected_cash(self):
         open_session(self.user, Decimal('10000'))

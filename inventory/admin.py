@@ -175,6 +175,24 @@ class ProductAdmin(admin.ModelAdmin):
     list_editable = ('active',)
     autocomplete_fields = ('category', 'base_unit')
     inlines = (ProductUnitInline,)
+    fieldsets = (
+        (None, {
+            'fields': (
+                'name',
+                'sku',
+                'category',
+                'brand',
+                'base_unit',
+                'description',
+                'min_stock',
+                'active',
+            ),
+        }),
+        ('Image', {
+            'fields': ('image',),
+            'description': 'Optional. Leave empty to keep the default POS card background.',
+        }),
+    )
 
     def get_queryset(self, request):
         return annotate_current_stock(super().get_queryset(request))
