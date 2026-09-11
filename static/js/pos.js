@@ -52,17 +52,21 @@
       discount = gross * discount / 100;
     }
     if (discount > gross) discount = gross;
-    const total = Math.max(0, gross - discount);
-    return { gross, discount, total };
+    const taxable = Math.max(0, gross - discount);
+    const rate = Number(item.tax_rate) || 0;
+    const tax = taxable * rate / 100;
+    const total = taxable + tax;
+    return { gross, discount, taxable, tax, total };
   }
 
   function invoiceAmounts() {
-    const subtotal = cart.reduce((sum, item) => sum + lineAmounts(item).total, 0);
+    const lines = cart.map(lineAmounts);
+    const subtotal = lines.reduce((sum, line) => sum + line.taxable, 0);
     const type = document.getElementById('invoice-discount-type').value;
     const value = Number(document.getElementById('invoice-discount-value').value) || 0;
     let discount = type === 'percent' ? subtotal * value / 100 : value;
     if (discount > subtotal) discount = subtotal;
-    const tax = Number(document.getElementById('invoice-tax').value) || 0;
+    const tax = lines.reduce((sum, line) => sum + line.tax, 0);
     const total = Math.max(0, subtotal - discount + tax);
     const paidField = document.getElementById('paid-amount').value;
     const paid = paidField === '' ? total : (Number(paidField) || 0);
@@ -291,6 +295,7 @@
         discount_type: 'percent',
         discount_value: 0,
         discount_custom: false,
+        tax_rate: product.tax_rate || 0,
         conversion_to_base: product.conversion_to_base,
         stock_on_hand: product.stock_on_hand,
         stock_in_unit: product.stock_in_unit,
@@ -422,10 +427,8 @@
     renderCart();
   });
 
-  ['invoice-tax', 'paid-amount'].forEach(function (id) {
-    document.getElementById(id).addEventListener('input', updateTotals);
-    document.getElementById(id).addEventListener('change', updateTotals);
-  });
+  document.getElementById('paid-amount').addEventListener('input', updateTotals);
+  document.getElementById('paid-amount').addEventListener('change', updateTotals);
 
   document.querySelectorAll('input[name="discount-type-ui"]').forEach(function (input) {
     input.addEventListener('change', function () {
@@ -496,11 +499,11 @@
           unit_price: item.unit_price,
           discount_type: item.discount_type,
           discount_value: item.discount_value,
+          tax_rate: item.tax_rate || 0,
         };
       }),
       discount_type: document.getElementById('invoice-discount-type').value,
       discount_value: document.getElementById('invoice-discount-value').value,
-      tax: document.getElementById('invoice-tax').value,
       paid_amount: forDraft ? (paidField || '0') : (paidField === '' ? moneyNumber(totals.total) : paidField),
       payment_method: selectedPaymentMethod(),
     };
@@ -538,7 +541,6 @@
     document.getElementById('customer-name').value = draft.customer_name || '';
     document.getElementById('invoice-discount-type').value = draft.discount_type || 'fixed';
     document.getElementById('invoice-discount-value').value = draft.discount_value || '0';
-    document.getElementById('invoice-tax').value = draft.tax || '0';
     setPaymentMethod(draft.payment_method || 'cash');
     document.getElementById('paid-amount').value = Number(draft.paid_amount) ? draft.paid_amount : '';
     (draft.items || []).forEach(function (item) {
@@ -553,6 +555,7 @@
         discount_type: item.discount_type || 'percent',
         discount_value: item.discount_value || 0,
         discount_custom: false,
+        tax_rate: item.tax_rate || 0,
         conversion_to_base: item.conversion_to_base,
         stock_on_hand: item.stock_on_hand,
         stock_in_unit: item.stock_in_unit,

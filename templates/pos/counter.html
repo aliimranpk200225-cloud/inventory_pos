@@ -143,13 +143,6 @@
             </div>
           </div>
           <div class="mb-2">
-            <label class="form-label small mb-1" for="invoice-tax">Tax</label>
-            <div class="input-group input-group-sm">
-              <span class="input-group-text">Rs.</span>
-              <input id="invoice-tax" class="form-control" type="number" min="0" step="0.01" value="0">
-            </div>
-          </div>
-          <div class="mb-2">
             <label class="form-label small mb-1" for="paid-amount">Paid</label>
             <div class="input-group input-group-sm">
               <span class="input-group-text">Rs.</span>
@@ -173,19 +166,6 @@
         <button id="draft-btn" type="button" class="btn btn-outline-secondary">Save draft</button>
         <button id="checkout-btn" type="button" class="btn btn-primary">Complete sale</button>
       </div>
-
-      {% if recent_sales %}
-        <h3>Recent invoices</h3>
-        <ul class="recent-invoices">
-          {% for sale in recent_sales %}
-            <li>
-              <a href="{% url 'pos:invoice' sale.pk %}">{{ sale.invoice_number }}</a>
-              — {{ sale.customer_name|default:"Walk-in" }}
-              (Rs. {{ sale.total }})
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
     </aside>
   </div>
 {% endblock %}

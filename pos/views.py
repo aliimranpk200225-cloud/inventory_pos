@@ -95,6 +95,7 @@ def _draft_payload(sale):
             'unit_price': str(item.unit_price),
             'discount_type': item.discount_type,
             'discount_value': str(item.discount_value),
+            'tax_rate': str(item.tax_rate),
             'conversion_to_base': str(unit.conversion_to_base),
             'stock_on_hand': format_quantity(on_hand),
             'stock_in_unit': format_quantity(on_hand / (unit.conversion_to_base or Decimal('1'))),
@@ -178,9 +179,7 @@ def counter(request, sale_id=None):
             messages.error(request, 'Only draft orders can be reopened.')
             return redirect('pos:orders')
         draft = _draft_payload(sale)
-    recent = session.sales.filter(status=PostingStatus.POSTED).select_related('customer')[:8]
     return render(request, 'pos/counter.html', {
-        'recent_sales': recent,
         'allow_negative_stock': getattr(settings, 'INVENTORY_ALLOW_NEGATIVE_STOCK', False),
         'session': session,
         'totals': totals,
@@ -268,6 +267,7 @@ def product_search(request):
             'min_stock': format_quantity(unit.product.min_stock),
             'stock_status': status,
             'image_url': _product_image_url(unit.product),
+            'tax_rate': str(unit.product.tax_rate),
         })
     return JsonResponse({'results': results})
 

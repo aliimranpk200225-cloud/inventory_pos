@@ -40,6 +40,20 @@ def _payment_method(value):
     return method
 
 
+def _tax_rate(value, default='0'):
+    if value in (None, ''):
+        value = default
+    try:
+        rate = Decimal(str(value)).quantize(Decimal('0.01'))
+    except (InvalidOperation, TypeError) as exc:
+        raise CheckoutError('Invalid tax rate.') from exc
+    if rate < 0:
+        raise CheckoutError('Tax rate cannot be negative.')
+    if rate > 100:
+        raise CheckoutError('Tax rate cannot exceed 100.')
+    return rate
+
+
 def _discount_type(value):
     if value in ('fixed', 'percent', '', None):
         return value or 'fixed'
@@ -69,7 +83,6 @@ def _get_draft_for_update(user, session, payload):
 
 def _replace_items(sale, items_data):
     sale.items.all().delete()
-    subtotal = Decimal('0.00')
     for row in items_data:
         product_unit = ProductUnit.objects.select_related('product', 'unit').filter(
             pk=row.get('product_unit_id'),
@@ -77,6 +90,7 @@ def _replace_items(sale, items_data):
         ).first()
         if product_unit is None:
             raise CheckoutError('One of the selected products was not found.')
+        default_rate = product_unit.product.tax_rate
         item = SaleItem(
             sale=sale,
             product_unit=product_unit,
@@ -84,11 +98,10 @@ def _replace_items(sale, items_data):
             unit_price=_money(row.get('unit_price'), default=str(product_unit.retail_price)),
             discount_type=_discount_type(row.get('discount_type')),
             discount_value=_money(row.get('discount_value')),
-            tax=_money(row.get('tax')),
+            tax_rate=_tax_rate(row.get('tax_rate'), default=str(default_rate)),
         )
         item.save()
-        subtotal += item.total
-    return subtotal
+    sale.refresh_totals_from_items()
 
 
 def _apply_header(sale, user, session, payload, customer):
@@ -105,7 +118,6 @@ def _apply_header(sale, user, session, payload, customer):
     sale.payment_method = _payment_method(payload.get('payment_method'))
     sale.discount_type = _discount_type(payload.get('discount_type'))
     sale.discount_value = _money(payload.get('discount_value'))
-    sale.tax = _money(payload.get('tax'))
     sale.notes = (payload.get('notes') or '').strip()
 
 
@@ -128,8 +140,7 @@ def save_sale(user, payload, *, as_draft=False):
         sale.paid_amount = _money('0' if paid in (None, '') else paid)
     sale.save()
 
-    subtotal = _replace_items(sale, items_data)
-    sale.subtotal = subtotal
+    _replace_items(sale, items_data)
     if not as_draft and payload.get('paid_amount') in (None, ''):
         sale.paid_amount = Decimal('0')
         sale.save()

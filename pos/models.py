@@ -1,7 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -99,6 +99,15 @@ class Sale(DiscountMixin, models.Model):
             return extra.quantize(Decimal('0.01'))
         return Decimal('0.00')
 
+    def refresh_totals_from_items(self):
+        subtotal = Decimal('0.00')
+        tax = Decimal('0.00')
+        for item in self.items.all():
+            subtotal += item.line_subtotal - item.applied_discount
+            tax += item.tax
+        self.subtotal = subtotal.quantize(Decimal('0.01'))
+        self.tax = tax.quantize(Decimal('0.01'))
+
     def save(self, *args, **kwargs):
         if not self.invoice_number:
             self.invoice_number = f'TMP-{timezone.now().strftime("%Y%m%d%H%M%S%f")}'
@@ -137,6 +146,13 @@ class SaleItem(DiscountMixin, models.Model):
         validators=[MinValueValidator(Decimal('0.0001'))],
     )
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    tax_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(Decimal('100'))],
+        help_text='Product tax percent stored at sale time.',
+    )
     tax = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     base_quantity = models.DecimalField(max_digits=12, decimal_places=4, default=0)
@@ -155,11 +171,21 @@ class SaleItem(DiscountMixin, models.Model):
     def applied_discount(self):
         return self.discount_amount(self.line_subtotal)
 
+    @property
+    def taxable_amount(self):
+        return self.line_subtotal - self.applied_discount
+
     def save(self, *args, **kwargs):
         if self.unit_price is None and self.product_unit_id:
             self.unit_price = self.product_unit.retail_price
         self.base_quantity = self.quantity * self.product_unit.conversion_to_base
-        self.total = self.line_subtotal - self.applied_discount + self.tax
+        rate = Decimal(str(self.tax_rate or 0))
+        taxable = self.taxable_amount
+        if taxable <= 0 or rate <= 0:
+            self.tax = Decimal('0.00')
+        else:
+            self.tax = (taxable * rate / Decimal('100')).quantize(Decimal('0.01'))
+        self.total = taxable + self.tax
         super().save(*args, **kwargs)
 
 

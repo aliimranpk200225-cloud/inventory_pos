@@ -23,11 +23,12 @@ class SaleItemInline(admin.TabularInline):
         'unit_price',
         'discount_type',
         'discount_value',
+        'tax_rate',
         'tax',
         'total',
         'base_quantity',
     )
-    readonly_fields = ('total', 'base_quantity')
+    readonly_fields = ('tax', 'total', 'base_quantity')
 
 
 @admin.register(Sale)
@@ -50,6 +51,7 @@ class SaleAdmin(admin.ModelAdmin):
     readonly_fields = (
         'invoice_number',
         'applied_discount',
+        'tax',
         'total',
         'due_amount',
         'payment_status',
@@ -75,6 +77,8 @@ class SaleAdmin(admin.ModelAdmin):
         super().save_related(request, form, formsets, change)
         sale = form.instance
         sale.refresh_from_db()
+        sale.refresh_totals_from_items()
+        sale.save()
         sync_sale_stock(sale, request.user)
 
 

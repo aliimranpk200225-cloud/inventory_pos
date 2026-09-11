@@ -54,6 +54,7 @@
           <th>Qty</th>
           <th>Price</th>
           <th>Discount</th>
+          <th>Tax</th>
           <th>Total</th>
         </tr>
       </thead>
@@ -70,6 +71,13 @@
               {% if item.discount_value %}
                 {% if item.discount_type == 'percent' %}{{ item.discount_value|qty }}%{% else %}Rs. {{ item.discount_value|rs }}{% endif %}
                 (Rs. {{ item.applied_discount|rs }})
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if item.tax_rate %}
+                {{ item.tax_rate|qty }}% (Rs. {{ item.tax|rs }})
               {% else %}
                 —
               {% endif %}

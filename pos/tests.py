@@ -56,6 +56,7 @@ class ProductSearchStockTests(TestCase):
         self.assertEqual(row['base_unit'], 'Btl')
         self.assertEqual(row['image_url'], '')
         self.assertFalse(self.product.image)
+        self.assertEqual(row['tax_rate'], '0.00')
 
     def test_product_search_returns_image_url_when_uploaded(self):
         uploaded = SimpleUploadedFile(
@@ -473,6 +474,135 @@ class CashSessionTests(TestCase):
         self.assertEqual(sale.subtotal, Decimal('995.00'))
         self.assertEqual(sale.total, Decimal('995.00'))
 
+    def test_product_tax_defaults_to_zero(self):
+        self.assertEqual(self.product.tax_rate, Decimal('0.00'))
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '100.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '100',
+            'tax': '50',
+        })
+        item = sale.items.get()
+        self.assertEqual(item.tax_rate, Decimal('0.00'))
+        self.assertEqual(item.tax, Decimal('0.00'))
+        self.assertEqual(sale.tax, Decimal('0.00'))
+        self.assertEqual(sale.total, Decimal('100.00'))
+
+    def test_ten_percent_product_tax(self):
+        self.product.tax_rate = Decimal('10')
+        self.product.save()
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '500.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '550',
+        })
+        item = sale.items.get()
+        self.assertEqual(item.tax_rate, Decimal('10.00'))
+        self.assertEqual(item.tax, Decimal('50.00'))
+        self.assertEqual(sale.subtotal, Decimal('500.00'))
+        self.assertEqual(sale.tax, Decimal('50.00'))
+        self.assertEqual(sale.total, Decimal('550.00'))
+
+    def test_eighteen_percent_product_tax_on_quantity(self):
+        self.product.tax_rate = Decimal('18')
+        self.product.save()
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '2',
+                'unit_price': '100.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '236',
+        })
+        item = sale.items.get()
+        self.assertEqual(item.tax, Decimal('36.00'))
+        self.assertEqual(item.total, Decimal('236.00'))
+        self.assertEqual(sale.subtotal, Decimal('200.00'))
+        self.assertEqual(sale.tax, Decimal('36.00'))
+        self.assertEqual(sale.total, Decimal('236.00'))
+
+    def test_item_discount_applies_before_tax(self):
+        self.product.tax_rate = Decimal('18')
+        self.product.save()
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '1000.00',
+                'discount_type': 'percent',
+                'discount_value': '10',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '1062',
+        })
+        item = sale.items.get()
+        self.assertEqual(item.applied_discount, Decimal('100.00'))
+        self.assertEqual(item.taxable_amount, Decimal('900.00'))
+        self.assertEqual(item.tax, Decimal('162.00'))
+        self.assertEqual(item.total, Decimal('1062.00'))
+        self.assertEqual(sale.subtotal, Decimal('900.00'))
+        self.assertEqual(sale.tax, Decimal('162.00'))
+        self.assertEqual(sale.total, Decimal('1062.00'))
+
+    def test_mixed_line_tax_rates_sum_on_invoice(self):
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [
+                {
+                    'product_unit_id': self.unit.pk,
+                    'quantity': '2',
+                    'unit_price': '100.00',
+                    'tax_rate': '18',
+                },
+                {
+                    'product_unit_id': self.unit.pk,
+                    'quantity': '1',
+                    'unit_price': '500.00',
+                    'tax_rate': '10',
+                },
+            ],
+            'payment_method': 'cash',
+            'paid_amount': '786',
+        })
+        taxes = list(sale.items.order_by('id').values_list('tax', flat=True))
+        self.assertEqual(taxes, [Decimal('36.00'), Decimal('50.00')])
+        self.assertEqual(sale.subtotal, Decimal('700.00'))
+        self.assertEqual(sale.tax, Decimal('86.00'))
+        self.assertEqual(sale.total, Decimal('786.00'))
+
+    def test_sale_item_keeps_tax_rate_after_product_change(self):
+        self.product.tax_rate = Decimal('10')
+        self.product.save()
+        open_session(self.user, Decimal('10000'))
+        sale = checkout(self.user, {
+            'items': [{
+                'product_unit_id': self.unit.pk,
+                'quantity': '1',
+                'unit_price': '100.00',
+            }],
+            'payment_method': 'cash',
+            'paid_amount': '110',
+        })
+        self.product.tax_rate = Decimal('18')
+        self.product.save()
+        item = sale.items.get()
+        self.assertEqual(item.tax_rate, Decimal('10.00'))
+        self.assertEqual(item.tax, Decimal('10.00'))
+        self.assertEqual(sale.tax, Decimal('10.00'))
+
     def test_counter_has_bootstrap_discount_and_balance_ui(self):
         open_session(self.user, Decimal('10000'))
         response = self.client.get('/pos/counter/')
@@ -496,6 +626,8 @@ class CashSessionTests(TestCase):
         self.assertContains(response, 'col-md-6')
         self.assertContains(response, 'Customer Name')
         self.assertContains(response, 'Phone Number')
+        self.assertContains(response, 'id="sum-tax"')
+        self.assertNotContains(response, 'id="invoice-tax"')
 
     def test_card_sale_does_not_increase_expected_cash(self):
         open_session(self.user, Decimal('10000'))

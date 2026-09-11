@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 
 
@@ -98,6 +98,13 @@ class Product(models.Model):
         blank=True,
         null=True,
         help_text='Optional. Shown as the POS product card background when uploaded.',
+    )
+    tax_rate = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(Decimal('100'))],
+        help_text='Optional percent tax applied to the discounted POS line total. 0 means no tax.',
     )
     min_stock = models.DecimalField(max_digits=12, decimal_places=4, default=0)
     active = models.BooleanField(default=True)
